@@ -1,0 +1,3 @@
+export const STEP      = 0.05;
+export const MIN_SPEED = 0.1;
+export const MAX_SPEED = 16.0;

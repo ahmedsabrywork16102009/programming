@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusBlock</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo-area">
+        <img src="../assets/logo.png" alt="FocusBlock Logo" class="app-logo">
+        <h1>FocusBlock</h1>
+      </div>
+      <button id="themeToggle" class="theme-toggle" title="Toggle Theme">
+        <span class="theme-icon">🌙</span>
+      </button>
+    </div>
+    
+    <!-- Input Section -->
+    <div class="input-section">
+      <input 
+        type="text" 
+        id="websiteInput" 
+        placeholder="Enter website domain (e.g., facebook.com)"
+        autocomplete="off"
+      >
+      <button id="addBtn">Add</button>
+    </div>
+
+    <!-- Message Alert Box -->
+    <div id="messageBox" class="message-box hidden"></div>
+
+    <!-- List Section -->
+    <div class="list-section">
+      <div class="list-tabs">
+        <button id="manageBlacklistBtn" class="list-tab active">
+          <span>🚫</span> Blacklist
+        </button>
+        <button id="manageWhitelistBtn" class="list-tab">
+          <span>🛡️</span> Whitelist
+        </button>
+        <button id="manageExceptionsBtn" class="list-tab">
+          <span>⭐</span> Exceptions
+        </button>
+      </div>
+      
+      <div id="websitesList" class="websites-list">
+        <p class="empty-message">No websites listed. Add one above!</p>
+      </div>
+    </div>
+
+    <!-- Danger Footer Action -->
+    <button id="clearAllBtn" class="danger-btn hidden">Clear List</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

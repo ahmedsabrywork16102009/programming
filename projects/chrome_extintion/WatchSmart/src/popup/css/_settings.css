@@ -1,0 +1,298 @@
+/* ── Settings Panel ────────────────────────────────────────── */
+#settings-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s, transform 0.2s;
+    padding: 4px;
+    border-radius: 6px;
+}
+
+.icon-btn:hover {
+    color: var(--accent);
+    background: rgba(0, 242, 254, 0.1);
+}
+
+.settings-header h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text);
+}
+
+.settings-content {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.setting-group-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent);
+    font-weight: 700;
+    margin: 0;
+}
+
+/* ── Accordion ─────────────────────────────────────────────── */
+.accordion-section {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.accordion-header:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.accordion-header .chevron {
+    color: var(--muted);
+    transition: transform 0.3s ease;
+    opacity: 0.6;
+}
+
+.accordion-section.open {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(0, 242, 254, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.accordion-section.open .chevron {
+    transform: rotate(180deg);
+    color: var(--accent);
+    opacity: 1;
+}
+
+.accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 16px;
+}
+
+.accordion-section.open .accordion-content {
+    max-height: 500px;
+    padding: 0 16px 16px 16px;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.setting-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(0, 242, 254, 0.2);
+}
+
+.setting-item label {
+    font-size: 13px;
+    color: #e2e8f0;
+    font-weight: 500;
+}
+
+.setting-item input[type="number"] {
+    width: 64px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--accent);
+    padding: 8px;
+    border-radius: 8px;
+    text-align: center;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    outline: none;
+    transition: all 0.2s;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    -moz-appearance: textfield; /* Firefox */
+    appearance: textfield;
+}
+
+/* Hide native arrows for Chrome/Safari/Edge */
+.setting-item input[type="number"]::-webkit-outer-spin-button,
+.setting-item input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+
+.setting-item input[type="number"]:focus {
+    border-color: var(--accent);
+    background: rgba(0, 242, 254, 0.05);
+    box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.2), inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.primary-btn {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.primary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 242, 254, 0.3);
+}
+
+.primary-btn:active {
+    transform: translateY(0);
+}
+
+.secondary-btn {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    color: #cbd5e1;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.secondary-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.backup-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+/* Info Icon & Tooltips */
+.info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 800;
+    margin-left: 6px;
+    cursor: help;
+    vertical-align: middle;
+    transition: all 0.2s;
+    border: 1px solid rgba(0, 242, 254, 0.2);
+}
+
+.info-icon:hover {
+    background: var(--accent);
+    color: var(--bg);
+    transform: scale(1.1);
+}
+
+/* Enhancing Native Tooltips */
+[title] {
+    cursor: help;
+}
+
+/* Save Success Animation */
+.save-success {
+    background: #10b981 !important;
+    color: white !important;
+}
+
+/* ── GDrive Specific ────────────────────────────────────────── */
+.gdrive-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.status-msg {
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-top: 8px;
+    text-align: center;
+    transition: all 0.3s ease;
+    animation: slideIn 0.3s ease;
+}
+
+.status-msg.info {
+    background: rgba(0, 242, 254, 0.1);
+    color: var(--accent);
+    border: 1px solid rgba(0, 242, 254, 0.2);
+}
+
+.status-msg.success {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.status-msg.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.status-msg.hidden {
+    display: none;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}

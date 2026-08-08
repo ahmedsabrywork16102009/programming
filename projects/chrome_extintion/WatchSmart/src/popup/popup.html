@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>WatchSmart</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="css/popup.css">
+    </head>
+    <body>
+        <!-- HEADER (Global) -->
+        <div class="logo-container">
+            <div class="brand-group">
+                <img src="icons/icon48.png" alt="WatchSmart Logo">
+                <h1 data-i18n="appName">WatchSmart</h1>
+            </div>
+            <div class="header-actions">
+                <button id="settings-btn" class="icon-btn" data-i18n-title="settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path
+                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                        </path>
+                    </svg>
+                </button>
+                <label class="toggle-switch" id="toggle-label" data-i18n-title="toggleExt">
+                    <input type="checkbox" id="extension-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+        <!-- MAIN VIEW -->
+        <div id="main-view">
+            <!-- ── SPEED CONTROL SECTION ─────────────────────────────────── -->
+            <div class="speed-control-container">
+                <!-- Hidden speed value used by content script bridge -->
+                <span id="speed-val" style="display:none">1.0</span>
+                <!-- +/− Speed Controls + Big Number Display -->
+                <div class="speed-control-widget">
+                    <button id="speed-down-btn" class="speed-btn" data-i18n-title="decreaseSpeed">−</button>
+                    <div class="speed-input-wrapper">
+                        <input type="text" id="current-speed-input" class="speed-display"
+                            value="1.0">
+                        <span class="speed-unit">×</span>
+                    </div>
+                    <button id="speed-up-btn" class="speed-btn" data-i18n-title="increaseSpeed">+</button>
+                </div>
+                <!-- Slider -->
+                <div class="slider-section">
+                    <input type="range" id="main-slider" min="0" max="16.0" step="0.05" value="1.0">
+                </div>
+                <!-- Preset Speed Buttons -->
+                <div class="presets-grid">
+                    <button class="preset-btn" data-speed="0.5">0.5×</button>
+                    <button class="preset-btn active" data-speed="1.0">1×</button>
+                    <button class="preset-btn" data-speed="1.5">1.5×</button>
+                    <button class="preset-btn" data-speed="2.0">2×</button>
+                    <button class="preset-btn" data-speed="3.0">3×</button>
+                    <button class="preset-btn" data-speed="4.0">4×</button>
+                    <button class="preset-btn" data-speed="6.0">6×</button>
+                    <button class="preset-btn" data-speed="8.0">8×</button>
+                    <button class="preset-btn" data-speed="10.0">10×</button>
+                    <button class="preset-btn danger" data-speed="16.0">16×</button>
+                </div>
+            </div>
+        </div>
+        <!-- SETTINGS VIEW (Hidden by default) -->
+        <div id="settings-view" class="hidden">
+            <div class="settings-header">
+                <button id="back-btn" class="icon-btn" data-i18n-title="back">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                </button>
+                <h2 data-i18n="settings">Settings</h2>
+            </div>
+            <div class="settings-content">
+                <!-- 1. SPEED LIMITS & STEPS -->
+                <div class="accordion-section open">
+                    <div class="accordion-header">
+                        <div class="setting-group-title" data-i18n="speedLimits">Speed Limits & Steps</div>
+                        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="setting-item">
+                            <label><span data-i18n="defaultSpeed">Default Speed (R)</span> <span class="info-icon"
+                                    data-i18n-title="defaultSpeedTip">!</span></label>
+                            <input type="number" id="set-default-speed" value="1.0" min="0.1" step="0.1">
+                        </div>
+                        <div class="setting-item">
+                            <label><span data-i18n="minSpeed">Min Speed (S)</span> <span class="info-icon"
+                                    data-i18n-title="minSpeedTip">!</span></label>
+                            <input type="number" id="set-min-speed" value="0.1" min="0.1" step="0.1">
+                        </div>
+                        <div class="setting-item">
+                            <label><span data-i18n="maxAdSpeed">Max Ad Speed (M)</span> <span class="info-icon"
+                                    data-i18n-title="maxAdSpeedTip">!</span></label>
+                            <input type="number" id="set-ad-speed" value="16" min="1" max="16" step="1">
+                        </div>
+                        <div class="setting-item">
+                            <label><span data-i18n="step">Keyboard/Wheel Step</span> <span class="info-icon"
+                                    data-i18n-title="stepTip">!</span></label>
+                            <input type="number" id="set-speed-step" value="0.05" min="0.01" step="0.01">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. VIDEO SEEK STEPS -->
+                <div class="accordion-section">
+                    <div class="accordion-header">
+                        <div class="setting-group-title" data-i18n="seekSteps">Video Seek Steps</div>
+                        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="setting-item">
+                            <label><span data-i18n="smallJump">Small Jump (s)</span> <span class="info-icon"
+                                    data-i18n-title="smallJumpTip">!</span></label>
+                            <input type="number" id="set-seek-small" value="5" min="1" step="1">
+                        </div>
+                        <div class="setting-item">
+                            <label><span data-i18n="mediumJump">Medium Jump (s)</span> <span class="info-icon"
+                                    data-i18n-title="mediumJumpTip">!</span></label>
+                            <input type="number" id="set-seek-medium" value="10" min="1" step="1">
+                        </div>
+                        <div class="setting-item">
+                            <label><span data-i18n="largeJump">Large Jump (s)</span> <span class="info-icon"
+                                    data-i18n-title="largeJumpTip">!</span></label>
+                            <input type="number" id="set-seek-large" value="30" min="1" step="1">
+                        </div>
+                        <div class="setting-item">
+                            <label><span data-i18n="extraJump">Extra Large Jump (s)</span> <span class="info-icon"
+                                    data-i18n-title="extraJumpTip">!</span></label>
+                            <input type="number" id="set-seek-extra" value="60" min="1" step="1">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. VISUALS & HUD -->
+                <div class="accordion-section">
+                    <div class="accordion-header">
+                        <div class="setting-group-title" data-i18n="visuals">Visuals & HUD</div>
+                        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="setting-item">
+                            <label><span data-i18n="showHud">Show Speed HUD</span> <span class="info-icon"
+                                    data-i18n-title="showHudTip">!</span></label>
+                            <label class="toggle-switch" style="transform: scale(0.8);">
+                                <input type="checkbox" id="set-show-hud" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <button id="save-settings-btn" class="primary-btn" style="margin-top: 16px; margin-bottom: 16px;"
+                    data-i18n="save">Save Settings</button>
+            </div>
+        </div>
+        <script type="module" src="js/main.js"></script>
+    </body>
+</html>
