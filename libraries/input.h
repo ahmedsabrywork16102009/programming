@@ -9,8 +9,8 @@
 namespace input {
 
 // --- Declarations ---
-std::string readString(std::string_view message, std::string_view errorMessage = "Error: This is not true! try again.\n");
-template <typename T> T readNumber(std::string_view message, std::string_view errorMessage = "Error: This is not a number! try again.\n");
+std::string readString(std::string_view message = "Enter text: ", std::string_view errorMessage = "Error: Invalid input! try again.\n");
+template <typename T> T readNumber(std::string_view message = "Enter number: ", std::string_view errorMessage = "Error: This is not a number! try again.\n");
 template <typename T> T readNumber(std::string_view message, T from, T to = std::numeric_limits<T>::max(), std::string_view typeErrorMessage = "Error: This is not a number! try again.\n", std::string_view rangeErrorMessage = "Error: This number is not in range! try again.\n");
 bool readBool(std::string_view message = "Enter [0]False, [1]True : ", std::string_view typeErrorMessage = "Error: This is not a number! try again.\n", std::string_view rangeErrorMessage = "Error: This is not \"0\" or \"1\" ! try again.\n");
 
