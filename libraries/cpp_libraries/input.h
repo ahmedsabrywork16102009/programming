@@ -13,6 +13,7 @@ std::string readString(std::string_view message = "Enter text: ", std::string_vi
 template <typename T> T readNumber(std::string_view message = "Enter number: ", std::string_view errorMessage = "Error: This is not a number! try again.\n");
 template <typename T> T readNumber(std::string_view message, T from, T to = std::numeric_limits<T>::max(), std::string_view typeErrorMessage = "Error: This is not a number! try again.\n", std::string_view rangeErrorMessage = "Error: This number is not in range! try again.\n");
 bool readBool(std::string_view message = "Enter [0]False, [1]True : ", std::string_view typeErrorMessage = "Error: This is not a number! try again.\n", std::string_view rangeErrorMessage = "Error: This is not \"0\" or \"1\" ! try again.\n");
+process::stDate readDate();
 
 
 // =================================================================================
@@ -77,6 +78,14 @@ T readNumber(std::string_view message, T from, T to, std::string_view typeErrorM
 
 inline bool readBool(std::string_view message, std::string_view typeErrorMessage, std::string_view rangeErrorMessage) {
   return readNumber<int>(message, 0, 1, typeErrorMessage, rangeErrorMessage) != 0;
+}
+
+inline process::stDate readDate() {
+  process::stDate date;
+  date.day = readNumber<size_t>("Enter Day: ");
+  date.month = readNumber<size_t>("Enter Month: ");
+  date.year = readNumber<size_t>("Enter Year: ");
+  return date;
 }
 
 } // namespace input

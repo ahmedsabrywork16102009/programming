@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <ctime>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -50,6 +51,13 @@ std::vector<std::string> splitString(std::string text,
 std::string numberToText(int number, enLanguage language = EN);
 
 // --- Date & Time (Declarations) ---
+struct stDate {
+  std::size_t day;
+  std::size_t month;
+  std::size_t year;
+  
+};
+
 constexpr bool isLeapYear(size_t year) noexcept;
 constexpr size_t daysInYear(size_t year) noexcept;
 constexpr size_t hoursInYear(size_t year) noexcept;
@@ -64,6 +72,19 @@ std::string joinDate(const size_t day, const size_t month,
 constexpr enWeekdays getWeekdayNumber(const size_t day, const size_t month,
                                       const size_t year) noexcept;
 std::string getMonthName(enMonths month, bool fullName = true) noexcept;
+size_t calculateDaysFromBeginingOfYear(size_t day, size_t month, size_t year);
+stDate getDate(size_t year, size_t numberOfDays, size_t daysAdd = 0);
+bool isDate1UpperDate2(stDate date1, stDate date2);
+bool isDate1EqualDate2(stDate date1, stDate date2);
+bool isLastDayInMonth(size_t day, size_t month, size_t year);
+bool isLastMonthInYear(size_t day, size_t month, size_t year);
+stDate increaseDate1Day(stDate date);
+size_t calculateDaysFrom1_1_1(stDate date, bool includeCurrentDay = false);
+long long calculateDate1BetweenDate2(stDate date1, stDate date2,
+                                     bool includeCurrentDay = false,
+                                     bool doYouWantDate1IsUpper = false);
+stDate getSystemDate();
+size_t calculateAgeWithDays(stDate date1);
 
 // =================================================================================
 //  Numbers
@@ -543,6 +564,146 @@ inline std::string getMonthName(const enMonths month, bool fullName) noexcept {
   }
 
   return "Invalid month";
+}
+
+inline size_t calculateDaysFromBeginingOfYear(size_t day, size_t month,
+                                       size_t year) {
+  if (month > 12 || month < 1 || day < 1 || day > daysInMonth(month, year)) {
+    return 0;
+  }
+
+  size_t totalDays = 0;
+
+  for (size_t i = 1; i < month; i++) {
+    totalDays += daysInMonth(i, year);
+  }
+
+  totalDays += day;
+
+  return totalDays;
+}
+
+inline stDate getDate(size_t year, size_t numberOfDays,
+               size_t daysAdd) {
+  stDate date;
+
+  date.month = 1;
+  date.day = numberOfDays + daysAdd;
+  date.year = year;
+
+  size_t tempDaysInYear;
+  while (date.day > (tempDaysInYear = daysInYear(date.year))) {
+    date.day -= tempDaysInYear;
+    date.year++;
+  }
+
+  size_t tempDaysInMonth;
+  while (date.day > (tempDaysInMonth = daysInMonth(date.month, date.year))) {
+    date.day -= tempDaysInMonth;
+    date.month++;
+  }
+
+  return date;
+}
+
+inline bool isDate1UpperDate2(stDate date1, stDate date2) {
+  return (date1.year > date2.year)
+             ? true
+             : ((date1.year == date2.year)
+                    ? (date1.month > date2.month
+                           ? true
+                           : (date1.month == date2.month ? date1.day > date2.day
+                                                         : false))
+                    : false);
+}
+
+inline bool isDate1EqualDate2(stDate date1, stDate date2) {
+  return (date1.year == date2.year)
+             ? ((date1.month == date2.month)
+                    ? ((date1.day == date2.day) ? true : false)
+                    : false)
+             : false;
+}
+
+inline bool isLastDayInMonth(size_t day, size_t month, size_t year) {
+  return day == daysInMonth(month, year);
+}
+
+inline bool isLastMonthInYear(size_t day, size_t month, size_t year) {
+  return month == 12;
+}
+
+inline stDate increaseDate1Day(stDate date) {
+  if (isLastDayInMonth(date.day, date.month, date.year)) {
+    if (isLastMonthInYear(date.day, date.month, date.year)) {
+      date.year++;
+      date.month = 1;
+      date.day = 1;
+    } else {
+      date.month++;
+      date.day = 1;
+    }
+  } else {
+    date.day++;
+  }
+
+  return date;
+}
+
+inline size_t calculateDaysFrom1_1_1(stDate date,
+                                   bool includeCurrentDay) {
+  size_t daysBetween = 0;
+
+  for (size_t year = 1; year < date.year; year++) {
+    daysBetween += daysInYear(year);
+  }
+
+  for (size_t month = 1; month < date.month; month++) {
+    daysBetween += daysInMonth(month, date.year);
+  }
+
+  daysBetween += date.day;
+
+  if (!includeCurrentDay && daysBetween > 0) {
+    daysBetween--;
+  }
+
+  return daysBetween;
+}
+
+inline long long calculateDate1BetweenDate2(stDate date1, stDate date2,
+                                       bool includeCurrentDay,
+                                       bool doYouWantDate1IsUpper) {
+  long long d1 = calculateDaysFrom1_1_1(date1);
+  long long d2 = calculateDaysFrom1_1_1(date2);
+
+  long long diff;
+
+  if (doYouWantDate1IsUpper) {
+    diff = (d2 >= d1) ? (d2 - d1) : (d1 - d2);
+  } else {
+    diff = (d1 - d2);
+  }
+
+  return includeCurrentDay ? diff + 1 : diff;
+}
+
+inline stDate getSystemDate() {
+  stDate date;
+
+  time_t t = time(0);
+  tm *ltm = localtime(&t);
+
+  date.day = ltm->tm_mday;
+  date.month = ltm->tm_mon + 1;
+  date.year = ltm->tm_year + 1900;
+
+  return date;
+}
+
+inline size_t calculateAgeWithDays(stDate date1) {
+  return calculateDaysFrom1_1_1(getSystemDate(), true) -
+         calculateDaysFrom1_1_1(date1);
 }
 
 } // namespace process

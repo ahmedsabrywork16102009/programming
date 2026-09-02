@@ -1,7 +1,7 @@
-#include "../../../libraries/enumeration.h"
-#include "../../../libraries/input.h"
-#include "../../../libraries/process.h"
-#include "../../../libraries/output.h"
+#include "../../../libraries/cpp_libraries/enumeration.h"
+#include "../../../libraries/cpp_libraries/input.h"
+#include "../../../libraries/cpp_libraries/output.h"
+#include "../../../libraries/cpp_libraries/process.h"
 
 #include <cstdlib>
 #include <fstream>
@@ -333,7 +333,8 @@ void depositScreen(vector<stClientData> &vClients) {
       isFirstTime = 0;
     }
 
-    depositValue = readNumber<double>("Enter deposit value: ", 0.0, std::numeric_limits<double>::max());
+    depositValue = readNumber<double>("Enter deposit value: ", 0.0,
+                                      std::numeric_limits<double>::max());
 
     if (readBool(
             "Are you sure you want to deposit this client [1] Yes [0] No: ")) {
@@ -376,7 +377,8 @@ void withdrawScreen(vector<stClientData> &vClients) {
         isFirstTime = 0;
       }
 
-      withdrawValue = readNumber<double>("Enter withdraw value: ", 0.0, std::numeric_limits<double>::max());
+      withdrawValue = readNumber<double>("Enter withdraw value: ", 0.0,
+                                         std::numeric_limits<double>::max());
 
       if ((hasEnoughBalance = isClientHasEnoughBalance(vClients, indexOfClient,
                                                        withdrawValue))) {

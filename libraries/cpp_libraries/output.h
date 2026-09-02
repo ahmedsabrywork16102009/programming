@@ -34,6 +34,7 @@ void printEachWordInLine(std::string_view text, char delimiter = ' ',
 std::string getWeekdayName(enWeekdays weekday) noexcept;
 void resetScreen(bool clearScreen = true, bool color = true);
 void printMonthCalendar(const enMonths month, const std::size_t year);
+void printDate(process::stDate date);
 
 // =================================================================================
 //  Outputs
@@ -184,6 +185,10 @@ inline void printYearCalendar(const std::size_t year) {
     printMonthCalendar(static_cast<enMonths>(month), year);
     std::cout << "\n";
   }
+}
+
+inline void printDate(process::stDate date) {
+  std::cout << date.day << "/" << date.month << "/" << date.year;
 }
 
 } // namespace output
