@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstddef>
 #include <ctime>
 #include <string>
 #include <string_view>
@@ -52,10 +53,13 @@ std::string numberToText(int number, enLanguage language = EN);
 
 // --- Date & Time (Declarations) ---
 struct stDate {
-  std::size_t day;
-  std::size_t month;
   std::size_t year;
-  
+  std::size_t month;
+  std::size_t day;
+  std::size_t hour;
+  std::size_t minute;
+  std::size_t second;
+  std::size_t milisecond;
 };
 
 constexpr bool isLeapYear(size_t year) noexcept;
@@ -68,10 +72,11 @@ constexpr size_t hoursInMonth(size_t month, size_t year) noexcept;
 constexpr size_t minutesInMonth(size_t month, size_t year) noexcept;
 constexpr size_t secondsInMonth(size_t month, size_t year) noexcept;
 std::string joinDate(const size_t day, const size_t month,
-                    const size_t year) noexcept;
-constexpr enWeekdays getWeekdayNumber(const size_t day, const size_t month,
-                                      const size_t year) noexcept;
+                     const size_t year) noexcept;
+enWeekdays getWeekdayNumber(const size_t day, const size_t month,
+                            const size_t year) noexcept;
 std::string getMonthName(enMonths month, bool fullName = true) noexcept;
+std::string getWeekdayName(enWeekdays weekday, bool shortName = false) noexcept;
 size_t calculateDaysFromBeginingOfYear(size_t day, size_t month, size_t year);
 stDate getDate(size_t year, size_t numberOfDays, size_t daysAdd = 0);
 bool isDate1UpperDate2(stDate date1, stDate date2);
@@ -489,21 +494,59 @@ constexpr size_t secondsInMonth(size_t month, size_t year) noexcept {
 }
 
 inline std::string joinDate(const size_t day, const size_t month,
-                           const size_t year) noexcept {
+                            const size_t year) noexcept {
   return std::to_string(day) + "/" + std::to_string(month) + "/" +
          std::to_string(year);
 }
 
-constexpr enWeekdays getWeekdayNumber(const size_t day, const size_t month,
-                                      const size_t year) noexcept {
-  int monthOffset = (14 - static_cast<int>(month)) / 12;
-  int adjustedYear = static_cast<int>(year) - monthOffset;
-  int adjustedMonth = static_cast<int>(month) + 12 * monthOffset - 2;
+constexpr enWeekdays getWeekdayNumber(stDate date) noexcept {
+  int monthOfset = (14 - static_cast<int>(date.month)) / 12;
+  int adjustedYear = static_cast<int>(date.year) - monthOfset;
+  int adjustedMonth = static_cast<int>(date.month) + 12 * monthOfset - 2;
   return static_cast<enWeekdays>(
-      ((static_cast<int>(day) + adjustedYear + adjustedYear / 4 -
+      ((static_cast<int>(date.day) + adjustedYear + adjustedYear / 4 -
         adjustedYear / 100 + adjustedYear / 400 + (31 * adjustedMonth) / 12) %
        7) +
       1); // adjusting to 1-7 mapping (Sunday=1)
+}
+
+inline bool isLastDayInWeek(enWeekdays weekday) noexcept {
+  return weekday == Friday;
+}
+
+inline bool isLastDayInWeek(const stDate &date) noexcept {
+  return isLastDayInWeek(getWeekdayNumber(date));
+}
+
+inline bool isItWeekend(enWeekdays weekday) noexcept {
+  return weekday == Friday;
+}
+
+inline bool isItWeekend(const stDate &date) noexcept {
+  return isItWeekend(getWeekdayNumber(date));
+}
+
+inline bool isItBusinessDay(enWeekdays weekday) noexcept {
+  return !isItWeekend(weekday);
+}
+
+inline bool isItBusinessDay(const stDate &date) noexcept {
+  return isItBusinessDay(getWeekdayNumber(date));
+}
+
+inline size_t calculateDaysUntilEndOfWeek(stDate date) {
+  return static_cast<size_t>(enWeekdays::Friday - getWeekdayNumber(date)) + 1;
+}
+
+inline size_t calculateDaysUntilEndOfMonth(stDate date) {
+  return daysInMonth(date.month, date.year) - date.day + 1;
+}
+
+inline size_t calculateDaysUntilEndOfYear(stDate date) {
+  for (size_t i = 1; i < date.month; i++) {
+    date.day += daysInMonth(i, date.year);
+  }
+  return daysInYear(date.year) - date.day + 1;
 }
 
 inline std::string getMonthName(const enMonths month, bool fullName) noexcept {
@@ -566,8 +609,46 @@ inline std::string getMonthName(const enMonths month, bool fullName) noexcept {
   return "Invalid month";
 }
 
+inline std::string getWeekdayName(enWeekdays weekday, bool shortName) noexcept {
+  if (shortName) {
+    switch (weekday) {
+    case Saturday:
+      return "Sat";
+    case Sunday:
+      return "Sun";
+    case Monday:
+      return "Mon";
+    case Tuesday:
+      return "Tue";
+    case Wednesday:
+      return "Wed";
+    case Thursday:
+      return "Thu";
+    case Friday:
+      return "Fri";
+    }
+  }
+  switch (weekday) {
+  case Saturday:
+    return "Saturday";
+  case Sunday:
+    return "Sunday";
+  case Monday:
+    return "Monday";
+  case Tuesday:
+    return "Tuesday";
+  case Wednesday:
+    return "Wednesday";
+  case Thursday:
+    return "Thursday";
+  case Friday:
+    return "Friday";
+  }
+  return "Invalid weekday";
+}
+
 inline size_t calculateDaysFromBeginingOfYear(size_t day, size_t month,
-                                       size_t year) {
+                                              size_t year) {
   if (month > 12 || month < 1 || day < 1 || day > daysInMonth(month, year)) {
     return 0;
   }
@@ -583,8 +664,7 @@ inline size_t calculateDaysFromBeginingOfYear(size_t day, size_t month,
   return totalDays;
 }
 
-inline stDate getDate(size_t year, size_t numberOfDays,
-               size_t daysAdd) {
+inline stDate getDate(size_t year, size_t numberOfDays, size_t daysAdd) {
   stDate date;
 
   date.month = 1;
@@ -633,25 +713,121 @@ inline bool isLastMonthInYear(size_t day, size_t month, size_t year) {
   return month == 12;
 }
 
-inline stDate increaseDate1Day(stDate date) {
-  if (isLastDayInMonth(date.day, date.month, date.year)) {
-    if (isLastMonthInYear(date.day, date.month, date.year)) {
+inline stDate increaseDateByXUnits(stDate date, size_t numberOfDays = 1,
+                                   size_t numberOfMonth = 0,
+                                   size_t numberOfYears = 0,
+                                   size_t numberOfDecades = 0,
+                                   size_t numberOfCenturies = 0,
+                                   size_t numberOfMillenniums = 0) {
+
+  if (numberOfMillenniums != 0) {
+    date.year += (numberOfMillenniums * 1000);
+  }
+
+  if (numberOfDecades != 0) {
+    date.year += (numberOfDecades * 10);
+  }
+
+  if (numberOfCenturies != 0) {
+    date.year += (numberOfCenturies * 100);
+  }
+
+  if (numberOfYears != 0) {
+    date.year += numberOfYears;
+  }
+
+  if (numberOfMonth != 0) {
+    date.month += numberOfMonth;
+
+    while (date.month > 12) {
+      date.month -= 12;
       date.year++;
-      date.month = 1;
-      date.day = 1;
-    } else {
-      date.month++;
-      date.day = 1;
     }
-  } else {
-    date.day++;
+  }
+
+  size_t maxDays = daysInMonth(date.month, date.year);
+  if (date.day > maxDays) {
+    date.day = maxDays;
+  }
+
+  if (numberOfDays != 0) {
+    date.day += numberOfDays;
+
+    size_t tempDaysInMonth;
+    while (date.day > (tempDaysInMonth = daysInMonth(date.month, date.year))) {
+      date.day -= tempDaysInMonth;
+      date.month++;
+
+      while (date.month > 12) {
+        date.month -= 12;
+        date.year++;
+      }
+    }
   }
 
   return date;
 }
 
-inline size_t calculateDaysFrom1_1_1(stDate date,
-                                   bool includeCurrentDay) {
+inline stDate decreaseDateByXUnits(stDate date, size_t numberOfDays = 1,
+                                   size_t numberOfMonth = 0,
+                                   size_t numberOfYears = 0,
+                                   size_t numberOfDecades = 0,
+                                   size_t numberOfCenturies = 0,
+                                   size_t numberOfMillenniums = 0) {
+
+  if (numberOfMillenniums != 0) {
+    date.year -= (numberOfMillenniums * 1000);
+  }
+
+  if (numberOfDecades != 0) {
+    date.year -= (numberOfDecades * 10);
+  }
+
+  if (numberOfCenturies != 0) {
+    date.year -= (numberOfCenturies * 100);
+  }
+
+  if (numberOfYears != 0) {
+    date.year -= numberOfYears;
+  }
+
+  if (numberOfMonth != 0) {
+    long long tempMonth = (long long)date.month - numberOfMonth;
+
+    while (tempMonth < 1) {
+      tempMonth += 12;
+      date.year--;
+    }
+
+    date.month = (size_t)tempMonth;
+  }
+
+  size_t maxDays = daysInMonth(date.month, date.year);
+  if (date.day > maxDays) {
+    date.day = maxDays;
+  }
+
+  if (numberOfDays != 0) {
+    long long tempDay = (long long)date.day - numberOfDays;
+
+    while (tempDay < 1) {
+      date.month--;
+
+      while (date.month < 1) {
+        date.month += 12;
+        date.year--;
+      }
+
+      tempDay += daysInMonth(date.month, date.year);
+    }
+
+    date.day = (size_t)tempDay;
+  }
+
+  return date;
+}
+
+inline size_t calculateDaysFrom1_1_1(stDate date, bool includeCurrentDay) {
   size_t daysBetween = 0;
 
   for (size_t year = 1; year < date.year; year++) {
@@ -672,8 +848,8 @@ inline size_t calculateDaysFrom1_1_1(stDate date,
 }
 
 inline long long calculateDate1BetweenDate2(stDate date1, stDate date2,
-                                       bool includeCurrentDay,
-                                       bool doYouWantDate1IsUpper) {
+                                            bool includeCurrentDay,
+                                            bool doYouWantDate1IsUpper) {
   long long d1 = calculateDaysFrom1_1_1(date1);
   long long d2 = calculateDaysFrom1_1_1(date2);
 
@@ -685,7 +861,7 @@ inline long long calculateDate1BetweenDate2(stDate date1, stDate date2,
     diff = (d1 - d2);
   }
 
-  return includeCurrentDay ? diff + 1 : diff;
+  return includeCurrentDay ? ((diff >= 0) ? diff + 1 : diff - 1) : diff;
 }
 
 inline stDate getSystemDate() {
@@ -705,6 +881,9 @@ inline size_t calculateAgeWithDays(stDate date1) {
   return calculateDaysFrom1_1_1(getSystemDate(), true) -
          calculateDaysFrom1_1_1(date1);
 }
+
+
+
 
 } // namespace process
 

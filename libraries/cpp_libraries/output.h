@@ -31,7 +31,7 @@ void printVector(const std::vector<std::string> &vTokens,
                  std::string_view separator = " ");
 void printEachWordInLine(std::string_view text, char delimiter = ' ',
                          std::string_view separator = "\n");
-std::string getWeekdayName(enWeekdays weekday) noexcept;
+
 void resetScreen(bool clearScreen = true, bool color = true);
 void printMonthCalendar(const enMonths month, const std::size_t year);
 void printDate(process::stDate date);
@@ -114,25 +114,7 @@ inline void printEachWordInLine(std::string_view text, char delimiter,
   }
 }
 
-inline std::string getWeekdayName(enWeekdays weekday) noexcept {
-  switch (weekday) {
-  case Saturday:
-    return "Saturday";
-  case Sunday:
-    return "Sunday";
-  case Monday:
-    return "Monday";
-  case Tuesday:
-    return "Tuesday";
-  case Wednesday:
-    return "Wednesday";
-  case Thursday:
-    return "Thursday";
-  case Friday:
-    return "Friday";
-  }
-  return "Invalid weekday";
-}
+
 
 inline void resetScreen(bool clearScreen, bool color) {
   if (clearScreen) {
