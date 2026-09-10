@@ -16,39 +16,35 @@ namespace process {
 using namespace enumeration;
 
 // --- Numbers (Declarations) ---
-template <typename T> enNumberType checkNumberType(T number);
-int randomNumber(int from, int to);
-int getRandomNumber(int from, int to);
+template <typename T> enNumber checkNumberType(T number);
+int randInt(int from, int to);
 template <typename T> constexpr bool validateNumber(T number, T from, T to);
 
 // --- Strings (Declarations) ---
-std::vector<char> getFirstLetterFromEachWord(std::string_view text,
-                                             int pos = 1);
-std::string getFirstLetterFromEachWordUpper(std::string text);
-char invertCharType(char letter);
-std::string changeCharType(std::string text, enCharsType charType);
+std::vector<char> getFirstLetters(std::string_view text, int pos = 1);
+std::string getLowerFirstLetters(std::string text);
+char invertChar(char letter);
+std::string changeCharCase(std::string text, enCharCase charCase);
 int countCapitalLetters(std::string_view text);
 int countSmallLetters(std::string_view text);
 int countSpaces(std::string_view text);
-int countLetterInString(std::string_view text, const char targetChar,
-                        bool matchCase = true);
+int countLetter(std::string_view text, const char targetChar,
+                bool matchCase = true);
 bool isVowel(char letter, bool matchCase = true);
-int countVowelsInString(std::string_view text, bool matchCase = true);
-std::vector<char> getVowelsInString(std::string_view text,
-                                    bool matchCase = true);
-std::vector<std::string> getTokensFromString(std::string_view text,
-                                             char delimiter = ' ');
+int countVowels(std::string_view text, bool matchCase = true);
+std::vector<char> getVowels(std::string_view text, bool matchCase = true);
+std::vector<std::string> split(std::string_view text, char delimiter = ' ');
 int countWords(std::string_view text, char delimiter = ' ');
 std::string trimLeft(std::string text, char delimiter = ' ');
 std::string trimRight(std::string text, char delimiter = ' ');
 std::string trimAll(std::string text, char delimiter = ' ');
-std::string trimString(std::string text, enTrimType trimType);
+std::string trimString(std::string text, enTrim trimType);
 std::string joinStrings(const std::vector<std::string> &vStrings,
                         std::string_view delimiter = " ",
                         bool isReverse = false);
-std::string removePunctuationFromTokens(std::string text);
-std::vector<std::string> splitString(std::string text,
-                                     std::string_view delimiter = "#//#");
+std::string stripPunctuation(std::string text);
+std::vector<std::string> splitByString(std::string text,
+                                       std::string_view delimiter = "#//#");
 std::string numberToText(int number, enLanguage language = EN);
 
 // --- Date & Time (Declarations) ---
@@ -56,10 +52,10 @@ struct stDate {
   std::size_t year;
   std::size_t month;
   std::size_t day;
-  std::size_t hour;
-  std::size_t minute;
-  std::size_t second;
-  std::size_t milisecond;
+};
+struct stPeriod {
+  stDate dateFrom;
+  stDate dateTo;
 };
 
 constexpr bool isLeapYear(size_t year) noexcept;
@@ -71,43 +67,60 @@ constexpr size_t daysInMonth(size_t month, size_t year) noexcept;
 constexpr size_t hoursInMonth(size_t month, size_t year) noexcept;
 constexpr size_t minutesInMonth(size_t month, size_t year) noexcept;
 constexpr size_t secondsInMonth(size_t month, size_t year) noexcept;
-std::string joinDate(const size_t day, const size_t month,
-                     const size_t year) noexcept;
-enWeekdays getWeekdayNumber(const size_t day, const size_t month,
-                            const size_t year) noexcept;
-std::string getMonthName(enMonths month, bool fullName = true) noexcept;
-std::string getWeekdayName(enWeekdays weekday, bool shortName = false) noexcept;
-size_t calculateDaysFromBeginingOfYear(size_t day, size_t month, size_t year);
-stDate getDate(size_t year, size_t numberOfDays, size_t daysAdd = 0);
-bool isDate1UpperDate2(stDate date1, stDate date2);
-bool isDate1EqualDate2(stDate date1, stDate date2);
+std::string joinDate(size_t day, size_t month, size_t year) noexcept;
+enWeekday getWeekday(size_t day, size_t month, size_t year) noexcept;
+enWeekday getWeekday(stDate date) noexcept;
+bool isLastDayInWeek(enWeekday weekday) noexcept;
+bool isLastDayInWeek(const stDate &date) noexcept;
+bool isWeekend(enWeekday weekday) noexcept;
+bool isWeekend(size_t day, size_t month, size_t year) noexcept;
+bool isWeekend(const stDate &date) noexcept;
+bool isBusinessDay(enWeekday weekday) noexcept;
+bool isBusinessDay(size_t day, size_t month, size_t year) noexcept;
+bool isBusinessDay(const stDate &date) noexcept;
+size_t daysLeftInWeek(stDate date);
+size_t daysLeftInMonth(stDate date);
+size_t daysLeftInYear(stDate date);
+std::string getMonthName(enMonth month, bool fullName = true) noexcept;
+std::string getWeekdayName(enWeekday weekday, bool shortName = false) noexcept;
+size_t dayOfYear(size_t day, size_t month, size_t year);
+stDate getDateFromDayOfYear(size_t year, size_t numberOfDays,
+                            size_t daysAdd = 0);
+bool isAfter(stDate date1, stDate date2);
+bool isBefore(stDate date1, stDate date2);
+bool isEqual(stDate date1, stDate date2);
 bool isLastDayInMonth(size_t day, size_t month, size_t year);
 bool isLastMonthInYear(size_t day, size_t month, size_t year);
-stDate increaseDate1Day(stDate date);
-size_t calculateDaysFrom1_1_1(stDate date, bool includeCurrentDay = false);
-long long calculateDate1BetweenDate2(stDate date1, stDate date2,
-                                     bool includeCurrentDay = false,
-                                     bool doYouWantDate1IsUpper = false);
+stDate addUnits(stDate date, size_t days = 1, size_t months = 0,
+                size_t years = 0, size_t decades = 0, size_t centuries = 0,
+                size_t millenniums = 0);
+stDate subUnits(stDate date, size_t days = 1, size_t months = 0,
+                size_t years = 0, size_t decades = 0, size_t centuries = 0,
+                size_t millenniums = 0);
+size_t daysFromYearOne(stDate date, bool includeCurrentDay = false);
+long long daysBetween(stDate date1, stDate date2,
+                      bool includeCurrentDay = false,
+                      bool absoluteDiff = false);
 stDate getSystemDate();
-size_t calculateAgeWithDays(stDate date1);
+size_t ageInDays(stDate birthDate);
+size_t calculateVacationDays(stDate dateFrom, stDate dateTo,
+                             bool includeWeekends = false);
+stDate CalculateVacationReturnDate(stDate date, long long vacationDays,
+                                   bool includeWeekends = false);
 
 // =================================================================================
 //  Numbers
 // =================================================================================
 
-template <typename T> enNumberType checkNumberType(T number) {
+template <typename T> enNumber checkNumberType(T number) {
   static_assert(std::is_arithmetic<T>::value, "This is not number.");
   return (static_cast<int>(number) & 1) ? Odd : Even;
 }
 
-inline int randomNumber(int from, int to) {
-  return rand() % (to - from + 1) + from;
-}
-
-inline int getRandomNumber(int from, int to) {
+inline int randInt(int from, int to) {
   if (from > to)
     std::swap(from, to);
-  return randomNumber(from, to);
+  return rand() % (to - from + 1) + from;
 }
 
 template <typename T> constexpr bool validateNumber(T number, T from, T to) {
@@ -118,8 +131,7 @@ template <typename T> constexpr bool validateNumber(T number, T from, T to) {
 //  Strings
 // =================================================================================
 
-inline std::vector<char> getFirstLetterFromEachWord(std::string_view text,
-                                                    int pos) {
+inline std::vector<char> getFirstLetters(std::string_view text, int pos) {
   std::vector<char> vChars;
   bool isFirst = true;
   for (size_t i = 0; i < text.length(); i++) {
@@ -133,7 +145,7 @@ inline std::vector<char> getFirstLetterFromEachWord(std::string_view text,
   return vChars;
 }
 
-inline std::string getFirstLetterFromEachWordUpper(std::string text) {
+inline std::string getLowerFirstLetters(std::string text) {
   bool isFirst = true;
   for (size_t i = 0; i < text.length(); i++) {
     if (text[i] != ' ' && isFirst) {
@@ -144,18 +156,18 @@ inline std::string getFirstLetterFromEachWordUpper(std::string text) {
   return text;
 }
 
-inline char invertCharType(char letter) {
+inline char invertChar(char letter) {
   return (std::islower(letter)) ? std::toupper(letter) : std::tolower(letter);
 }
 
-inline std::string changeCharType(std::string text, enCharsType charType) {
+inline std::string changeCharCase(std::string text, enCharCase charCase) {
   for (size_t i = 0; i < text.length(); i++) {
-    if (charType == enCharsType::Upper) {
+    if (charCase == enCharCase::Upper) {
       text[i] = std::toupper(text[i]);
-    } else if (charType == enCharsType::Lower) {
+    } else if (charCase == enCharCase::Lower) {
       text[i] = std::tolower(text[i]);
-    } else if (charType == enCharsType::Invert) {
-      text[i] = invertCharType(text[i]);
+    } else if (charCase == enCharCase::Invert) {
+      text[i] = invertChar(text[i]);
     }
   }
   return text;
@@ -191,8 +203,8 @@ inline int countSpaces(std::string_view text) {
   return countOfSpaces;
 }
 
-inline int countLetterInString(std::string_view text, const char targetChar,
-                               bool matchCase) {
+inline int countLetter(std::string_view text, const char targetChar,
+                       bool matchCase) {
   int counter = 0;
   for (char c : text) {
     if (matchCase) {
@@ -219,7 +231,7 @@ inline bool isVowel(char letter, bool matchCase) {
   }
 }
 
-inline int countVowelsInString(std::string_view text, bool matchCase) {
+inline int countVowels(std::string_view text, bool matchCase) {
   int counter = 0;
   for (char c : text) {
     if (isVowel(c, matchCase)) {
@@ -229,8 +241,7 @@ inline int countVowelsInString(std::string_view text, bool matchCase) {
   return counter;
 }
 
-inline std::vector<char> getVowelsInString(std::string_view text,
-                                           bool matchCase) {
+inline std::vector<char> getVowels(std::string_view text, bool matchCase) {
   std::vector<char> vVowels;
   for (char c : text) {
     if (isVowel(c, matchCase)) {
@@ -240,8 +251,7 @@ inline std::vector<char> getVowelsInString(std::string_view text,
   return vVowels;
 }
 
-inline std::vector<std::string> getTokensFromString(std::string_view text,
-                                                    char delimiter) {
+inline std::vector<std::string> split(std::string_view text, char delimiter) {
   if (text.empty()) {
     return {};
   }
@@ -305,13 +315,13 @@ inline std::string trimAll(std::string text, char delimiter) {
   return trimLeft(trimRight(text, delimiter), delimiter);
 }
 
-inline std::string trimString(std::string text, enTrimType trimType) {
+inline std::string trimString(std::string text, enTrim trimType) {
   switch (trimType) {
-  case enTrimType::TrimLeft:
+  case enTrim::TrimLeft:
     return trimLeft(text);
-  case enTrimType::TrimRight:
+  case enTrim::TrimRight:
     return trimRight(text);
-  case enTrimType::TrimAll:
+  case enTrim::TrimAll:
     return trimAll(text);
   default:
     return text;
@@ -341,7 +351,7 @@ inline std::string joinStrings(const std::vector<std::string> &vStrings,
   return text;
 }
 
-inline std::string removePunctuationFromTokens(std::string text) {
+inline std::string stripPunctuation(std::string text) {
   std::string newString = "";
   for (auto c : text) {
     if (std::ispunct(c)) {
@@ -352,8 +362,8 @@ inline std::string removePunctuationFromTokens(std::string text) {
   return newString;
 }
 
-inline std::vector<std::string> splitString(std::string text,
-                                            std::string_view delimiter) {
+inline std::vector<std::string> splitByString(std::string text,
+                                              std::string_view delimiter) {
   if (text.empty()) {
     return {};
   }
@@ -493,63 +503,75 @@ constexpr size_t secondsInMonth(size_t month, size_t year) noexcept {
   return minutesInMonth(month, year) * 60;
 }
 
-inline std::string joinDate(const size_t day, const size_t month,
-                            const size_t year) noexcept {
+inline std::string joinDate(size_t day, size_t month, size_t year) noexcept {
   return std::to_string(day) + "/" + std::to_string(month) + "/" +
          std::to_string(year);
 }
 
-constexpr enWeekdays getWeekdayNumber(stDate date) noexcept {
-  int monthOfset = (14 - static_cast<int>(date.month)) / 12;
-  int adjustedYear = static_cast<int>(date.year) - monthOfset;
-  int adjustedMonth = static_cast<int>(date.month) + 12 * monthOfset - 2;
-  return static_cast<enWeekdays>(
-      ((static_cast<int>(date.day) + adjustedYear + adjustedYear / 4 -
-        adjustedYear / 100 + adjustedYear / 400 + (31 * adjustedMonth) / 12) %
-       7) +
-      1); // adjusting to 1-7 mapping (Sunday=1)
+inline enWeekday getWeekday(size_t day, size_t month, size_t year) noexcept {
+  int monthOfset = (14 - static_cast<int>(month)) / 12;
+  int adjustedYear = static_cast<int>(year) - monthOfset;
+  int adjustedMonth = static_cast<int>(month) + 12 * monthOfset - 2;
+  return static_cast<enWeekday>(
+      (((static_cast<int>(day) + adjustedYear + adjustedYear / 4 -
+         adjustedYear / 100 + adjustedYear / 400 + (31 * adjustedMonth) / 12 +
+         1) %
+        7) +
+       1));
 }
 
-inline bool isLastDayInWeek(enWeekdays weekday) noexcept {
+inline enWeekday getWeekday(stDate date) noexcept {
+  return getWeekday(date.day, date.month, date.year);
+}
+
+inline bool isLastDayInWeek(enWeekday weekday) noexcept {
   return weekday == Friday;
 }
 
 inline bool isLastDayInWeek(const stDate &date) noexcept {
-  return isLastDayInWeek(getWeekdayNumber(date));
+  return isLastDayInWeek(getWeekday(date));
 }
 
-inline bool isItWeekend(enWeekdays weekday) noexcept {
-  return weekday == Friday;
+inline bool isWeekend(enWeekday weekday) noexcept {
+  return (weekday == Friday || weekday == Saturday);
 }
 
-inline bool isItWeekend(const stDate &date) noexcept {
-  return isItWeekend(getWeekdayNumber(date));
+inline bool isWeekend(size_t day, size_t month, size_t year) noexcept {
+  return isWeekend(getWeekday(day, month, year));
 }
 
-inline bool isItBusinessDay(enWeekdays weekday) noexcept {
-  return !isItWeekend(weekday);
+inline bool isWeekend(const stDate &date) noexcept {
+  return isWeekend(getWeekday(date));
 }
 
-inline bool isItBusinessDay(const stDate &date) noexcept {
-  return isItBusinessDay(getWeekdayNumber(date));
+inline bool isBusinessDay(enWeekday weekday) noexcept {
+  return !isWeekend(weekday);
 }
 
-inline size_t calculateDaysUntilEndOfWeek(stDate date) {
-  return static_cast<size_t>(enWeekdays::Friday - getWeekdayNumber(date)) + 1;
+inline bool isBusinessDay(const stDate &date) noexcept {
+  return isBusinessDay(getWeekday(date));
 }
 
-inline size_t calculateDaysUntilEndOfMonth(stDate date) {
+inline bool isBusinessDay(size_t day, size_t month, size_t year) noexcept {
+  return isBusinessDay(getWeekday(day, month, year));
+}
+
+inline size_t daysLeftInWeek(stDate date) {
+  return static_cast<size_t>(enWeekday::Friday - getWeekday(date)) + 1;
+}
+
+inline size_t daysLeftInMonth(stDate date) {
   return daysInMonth(date.month, date.year) - date.day + 1;
 }
 
-inline size_t calculateDaysUntilEndOfYear(stDate date) {
+inline size_t daysLeftInYear(stDate date) {
   for (size_t i = 1; i < date.month; i++) {
     date.day += daysInMonth(i, date.year);
   }
   return daysInYear(date.year) - date.day + 1;
 }
 
-inline std::string getMonthName(const enMonths month, bool fullName) noexcept {
+inline std::string getMonthName(enMonth month, bool fullName) noexcept {
   if (fullName) {
     switch (month) {
     case January:
@@ -609,7 +631,7 @@ inline std::string getMonthName(const enMonths month, bool fullName) noexcept {
   return "Invalid month";
 }
 
-inline std::string getWeekdayName(enWeekdays weekday, bool shortName) noexcept {
+inline std::string getWeekdayName(enWeekday weekday, bool shortName) noexcept {
   if (shortName) {
     switch (weekday) {
     case Saturday:
@@ -647,8 +669,7 @@ inline std::string getWeekdayName(enWeekdays weekday, bool shortName) noexcept {
   return "Invalid weekday";
 }
 
-inline size_t calculateDaysFromBeginingOfYear(size_t day, size_t month,
-                                              size_t year) {
+inline size_t dayOfYear(size_t day, size_t month, size_t year) {
   if (month > 12 || month < 1 || day < 1 || day > daysInMonth(month, year)) {
     return 0;
   }
@@ -664,7 +685,8 @@ inline size_t calculateDaysFromBeginingOfYear(size_t day, size_t month,
   return totalDays;
 }
 
-inline stDate getDate(size_t year, size_t numberOfDays, size_t daysAdd) {
+inline stDate getDateFromDayOfYear(size_t year, size_t numberOfDays,
+                                   size_t daysAdd) {
   stDate date;
 
   date.month = 1;
@@ -686,7 +708,7 @@ inline stDate getDate(size_t year, size_t numberOfDays, size_t daysAdd) {
   return date;
 }
 
-inline bool isDate1UpperDate2(stDate date1, stDate date2) {
+inline bool isAfter(stDate date1, stDate date2) {
   return (date1.year > date2.year)
              ? true
              : ((date1.year == date2.year)
@@ -697,12 +719,16 @@ inline bool isDate1UpperDate2(stDate date1, stDate date2) {
                     : false);
 }
 
-inline bool isDate1EqualDate2(stDate date1, stDate date2) {
+inline bool isEqual(stDate date1, stDate date2) {
   return (date1.year == date2.year)
              ? ((date1.month == date2.month)
                     ? ((date1.day == date2.day) ? true : false)
                     : false)
              : false;
+}
+
+inline bool isBefore(stDate date1, stDate date2) {
+  return !isAfter(date1, date2) && !isEqual(date1, date2);
 }
 
 inline bool isLastDayInMonth(size_t day, size_t month, size_t year) {
@@ -713,31 +739,27 @@ inline bool isLastMonthInYear(size_t day, size_t month, size_t year) {
   return month == 12;
 }
 
-inline stDate increaseDateByXUnits(stDate date, size_t numberOfDays = 1,
-                                   size_t numberOfMonth = 0,
-                                   size_t numberOfYears = 0,
-                                   size_t numberOfDecades = 0,
-                                   size_t numberOfCenturies = 0,
-                                   size_t numberOfMillenniums = 0) {
+inline stDate addUnits(stDate date, size_t days, size_t months, size_t years,
+                       size_t decades, size_t centuries, size_t millenniums) {
 
-  if (numberOfMillenniums != 0) {
-    date.year += (numberOfMillenniums * 1000);
+  if (millenniums != 0) {
+    date.year += (millenniums * 1000);
   }
 
-  if (numberOfDecades != 0) {
-    date.year += (numberOfDecades * 10);
+  if (decades != 0) {
+    date.year += (decades * 10);
   }
 
-  if (numberOfCenturies != 0) {
-    date.year += (numberOfCenturies * 100);
+  if (centuries != 0) {
+    date.year += (centuries * 100);
   }
 
-  if (numberOfYears != 0) {
-    date.year += numberOfYears;
+  if (years != 0) {
+    date.year += years;
   }
 
-  if (numberOfMonth != 0) {
-    date.month += numberOfMonth;
+  if (months != 0) {
+    date.month += months;
 
     while (date.month > 12) {
       date.month -= 12;
@@ -750,8 +772,8 @@ inline stDate increaseDateByXUnits(stDate date, size_t numberOfDays = 1,
     date.day = maxDays;
   }
 
-  if (numberOfDays != 0) {
-    date.day += numberOfDays;
+  if (days != 0) {
+    date.day += days;
 
     size_t tempDaysInMonth;
     while (date.day > (tempDaysInMonth = daysInMonth(date.month, date.year))) {
@@ -768,31 +790,27 @@ inline stDate increaseDateByXUnits(stDate date, size_t numberOfDays = 1,
   return date;
 }
 
-inline stDate decreaseDateByXUnits(stDate date, size_t numberOfDays = 1,
-                                   size_t numberOfMonth = 0,
-                                   size_t numberOfYears = 0,
-                                   size_t numberOfDecades = 0,
-                                   size_t numberOfCenturies = 0,
-                                   size_t numberOfMillenniums = 0) {
+inline stDate subUnits(stDate date, size_t days, size_t months, size_t years,
+                       size_t decades, size_t centuries, size_t millenniums) {
 
-  if (numberOfMillenniums != 0) {
-    date.year -= (numberOfMillenniums * 1000);
+  if (millenniums != 0) {
+    date.year -= (millenniums * 1000);
   }
 
-  if (numberOfDecades != 0) {
-    date.year -= (numberOfDecades * 10);
+  if (decades != 0) {
+    date.year -= (decades * 10);
   }
 
-  if (numberOfCenturies != 0) {
-    date.year -= (numberOfCenturies * 100);
+  if (centuries != 0) {
+    date.year -= (centuries * 100);
   }
 
-  if (numberOfYears != 0) {
-    date.year -= numberOfYears;
+  if (years != 0) {
+    date.year -= years;
   }
 
-  if (numberOfMonth != 0) {
-    long long tempMonth = (long long)date.month - numberOfMonth;
+  if (months != 0) {
+    long long tempMonth = (long long)date.month - months;
 
     while (tempMonth < 1) {
       tempMonth += 12;
@@ -807,8 +825,8 @@ inline stDate decreaseDateByXUnits(stDate date, size_t numberOfDays = 1,
     date.day = maxDays;
   }
 
-  if (numberOfDays != 0) {
-    long long tempDay = (long long)date.day - numberOfDays;
+  if (days != 0) {
+    long long tempDay = (long long)date.day - days;
 
     while (tempDay < 1) {
       date.month--;
@@ -827,7 +845,7 @@ inline stDate decreaseDateByXUnits(stDate date, size_t numberOfDays = 1,
   return date;
 }
 
-inline size_t calculateDaysFrom1_1_1(stDate date, bool includeCurrentDay) {
+inline size_t daysFromYearOne(stDate date, bool includeLastDay) {
   size_t daysBetween = 0;
 
   for (size_t year = 1; year < date.year; year++) {
@@ -840,28 +858,32 @@ inline size_t calculateDaysFrom1_1_1(stDate date, bool includeCurrentDay) {
 
   daysBetween += date.day;
 
-  if (!includeCurrentDay && daysBetween > 0) {
+  if (!includeLastDay && daysBetween > 0) {
     daysBetween--;
   }
 
   return daysBetween;
 }
 
-inline long long calculateDate1BetweenDate2(stDate date1, stDate date2,
-                                            bool includeCurrentDay,
-                                            bool doYouWantDate1IsUpper) {
-  long long d1 = calculateDaysFrom1_1_1(date1);
-  long long d2 = calculateDaysFrom1_1_1(date2);
+inline long long daysBetween(stDate date1, stDate date2, bool includeLastDay,
+                             bool absoluteDiff) {
+  long long d1 = daysFromYearOne(date1);
+  long long d2 = daysFromYearOne(date2);
 
   long long diff;
 
-  if (doYouWantDate1IsUpper) {
+  if (absoluteDiff) {
     diff = (d2 >= d1) ? (d2 - d1) : (d1 - d2);
   } else {
     diff = (d1 - d2);
   }
 
-  return includeCurrentDay ? ((diff >= 0) ? diff + 1 : diff - 1) : diff;
+  return includeLastDay ? ((diff >= 0) ? diff + 1 : diff - 1) : diff;
+}
+
+inline long long daysBetween(stPeriod period, bool includeLastDay,
+                             bool absoluteDiff) {
+  return daysBetween(period.dateFrom, period.dateTo, includeLastDay, absoluteDiff);
 }
 
 inline stDate getSystemDate() {
@@ -877,13 +899,42 @@ inline stDate getSystemDate() {
   return date;
 }
 
-inline size_t calculateAgeWithDays(stDate date1) {
-  return calculateDaysFrom1_1_1(getSystemDate(), true) -
-         calculateDaysFrom1_1_1(date1);
+inline size_t ageInDays(stDate birthDate) {
+  return daysFromYearOne(getSystemDate(), true) - daysFromYearOne(birthDate);
 }
 
+inline size_t calculateVacationDays(stDate dateFrom, stDate dateTo,
+                                    bool includeWeekends) {
+  size_t vacationDays = 0;
+  while (isBefore(dateFrom, dateTo)) {
+    if (includeWeekends || isBusinessDay(dateFrom)) {
+      vacationDays++;
+    }
+    dateFrom = addUnits(dateFrom, 1);
+  }
+  return vacationDays;
+}
 
+inline stDate CalculateVacationReturnDate(stDate date, long long vacationDays,
+                                          bool includeWeekends) {
+  stDate dateResult = date;
 
+  while (vacationDays > 0) {
+    if (includeWeekends || isBusinessDay(dateResult)) {
+      vacationDays--;
+    }
+
+    dateResult = addUnits(dateResult, 1);
+  }
+
+  if (!includeWeekends) {
+    while (!isBusinessDay(dateResult)) {
+      dateResult = addUnits(dateResult, 1);
+    }
+  }
+
+  return dateResult;
+}
 
 } // namespace process
 

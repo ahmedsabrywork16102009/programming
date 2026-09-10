@@ -23,18 +23,19 @@ void printString(std::string_view prefix, std::string_view string,
 void printNumberType(int number,
                      std::string_view evenMessage = "Number is Even.",
                      std::string_view oddMessage = "Number is Odd.");
-void printVector(const std::vector<int> &vNumbers,
+void printVector(const std::vector<int> &vec, std::string_view separator = " ");
+void printVector(const std::vector<char> &vec,
                  std::string_view separator = " ");
-void printVector(const std::vector<char> &vChars,
-                 std::string_view separator = " ");
-void printVector(const std::vector<std::string> &vTokens,
+void printVector(const std::vector<std::string> &vec,
                  std::string_view separator = " ");
 void printEachWordInLine(std::string_view text, char delimiter = ' ',
                          std::string_view separator = "\n");
 
 void resetScreen(bool clearScreen = true, bool color = true);
-void printMonthCalendar(const enMonths month, const std::size_t year);
+void printMonthCalendar(const enMonth month, const std::size_t year);
+void printYearCalendar(const std::size_t year);
 void printDate(process::stDate date);
+void printDateDetails(process::stDate date, std::string_view suffix = "Day: ");
 
 // =================================================================================
 //  Outputs
@@ -58,38 +59,38 @@ inline void printString(std::string_view prefix, std::string_view string,
 
 inline void printNumberType(int number, std::string_view evenMessage,
                             std::string_view oddMessage) {
-  if (checkNumberType(number) == enNumberType::Even) {
+  if (checkNumberType(number) == enNumber::Even) {
     std::cout << evenMessage;
   } else {
     std::cout << oddMessage;
   }
 }
 
-inline void printVector(const std::vector<int> &vNumbers,
+inline void printVector(const std::vector<int> &vec,
                         std::string_view separator) {
-  for (size_t i = 0; i < vNumbers.size(); i++) {
-    std::cout << vNumbers[i];
-    if ((i + 1) != vNumbers.size()) {
+  for (size_t i = 0; i < vec.size(); i++) {
+    std::cout << vec[i];
+    if ((i + 1) != vec.size()) {
       std::cout << separator;
     }
   }
 }
 
-inline void printVector(const std::vector<char> &vChars,
+inline void printVector(const std::vector<char> &vec,
                         std::string_view separator) {
-  for (size_t i = 0; i < vChars.size(); i++) {
-    std::cout << vChars[i];
-    if ((i + 1) != vChars.size()) {
+  for (size_t i = 0; i < vec.size(); i++) {
+    std::cout << vec[i];
+    if ((i + 1) != vec.size()) {
       std::cout << separator;
     }
   }
 }
 
-inline void printVector(const std::vector<std::string> &vTokens,
+inline void printVector(const std::vector<std::string> &vec,
                         std::string_view separator) {
-  for (size_t i = 0; i < vTokens.size(); i++) {
-    std::cout << vTokens[i];
-    if ((i + 1) != vTokens.size()) {
+  for (size_t i = 0; i < vec.size(); i++) {
+    std::cout << vec[i];
+    if ((i + 1) != vec.size()) {
       std::cout << separator;
     }
   }
@@ -114,8 +115,6 @@ inline void printEachWordInLine(std::string_view text, char delimiter,
   }
 }
 
-
-
 inline void resetScreen(bool clearScreen, bool color) {
   if (clearScreen) {
 #ifdef _WIN32
@@ -131,23 +130,23 @@ inline void resetScreen(bool clearScreen, bool color) {
   }
 }
 
-inline void printMonthCalendar(const enMonths month, const std::size_t year) {
+inline void printMonthCalendar(const enMonth month, const std::size_t year) {
 
-  size_t current = getWeekdayNumber(1, month, year) - 1;
+  size_t current = static_cast<size_t>(getWeekday(1, month, year)) - 1;
   size_t numberOfDays = daysInMonth(month, year);
 
   printf("\n  ______________ %s ______________\n\n",
          getMonthName(month, true).c_str());
 
-  std::cout << "  Sun  Mon  Tue  Wed  Thu  Fri  Sat\n";
+  std::cout << "  Sat  Sun  Mon  Tue  Wed  Thu  Fri\n";
 
-  int i;
+  size_t i;
   for (i = 0; i < current; i++) {
     printf("     ");
   }
 
-  for (int j = 1; j <= numberOfDays; j++) {
-    printf("%5d", j);
+  for (size_t j = 1; j <= numberOfDays; j++) {
+    printf("%5zu", j);
 
     if (++i == 7) {
       i = 0;
@@ -156,6 +155,7 @@ inline void printMonthCalendar(const enMonths month, const std::size_t year) {
   }
   printf("\n  _________________________________\n");
 }
+
 inline void printYearCalendar(const std::size_t year) {
   const std::string calendarHeader = "Calendar - " + std::to_string(year);
 
@@ -164,13 +164,18 @@ inline void printYearCalendar(const std::size_t year) {
   std::cout << "_______________________________________________\n\n";
 
   for (int month = 1; month <= 12; ++month) {
-    printMonthCalendar(static_cast<enMonths>(month), year);
+    printMonthCalendar(static_cast<enMonth>(month), year);
     std::cout << "\n";
   }
 }
 
 inline void printDate(process::stDate date) {
   std::cout << date.day << "/" << date.month << "/" << date.year;
+}
+
+inline void printDateDetails(process::stDate date, std::string_view suffix) {
+  std::cout << suffix << getWeekdayName(getWeekday(date), true) << ", ";
+  printDate(date);
 }
 
 } // namespace output
