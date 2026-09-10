@@ -170,7 +170,11 @@ inline void printYearCalendar(const std::size_t year) {
 }
 
 inline void printDate(process::stDate date) {
-  std::cout << date.day << "/" << date.month << "/" << date.year;
+  printf("%02zd/%02zd/%04zd\n", date.day, date.month, date.year);
+}
+
+inline void printDate(std::string_view dateString) {
+  std::cout << dateString << "\n";
 }
 
 inline void printDateDetails(process::stDate date, std::string_view suffix) {

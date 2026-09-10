@@ -37,6 +37,18 @@ enum enMonth {
 
 enum enOperation { Sum = 1, Subtract = 2, Multiply = 3, Divide = 4, MixOp = 5 };
 
+enum enDateCompare { Date1_After = 1, Date1_Before = -1, Date1_Equal = 0 };
+
+enum enDateFormat {
+  DD_MM_YYYYWithForwaredSlash = 1,
+  YYYY_MM_DDWithForwaredSlash = 2,
+  MM_DD_YYYYWithForwaredSlash = 3,
+  DD_MM_YYYYWithHyphen = 4,
+  YYYY_MM_DDWithHyphen = 5,
+  MM_DD_YYYYWithHyphen = 6,
+  basicFormat = 7
+};
+
 } // namespace enumeration
 
 namespace AS {

@@ -46,6 +46,9 @@ std::string stripPunctuation(std::string text);
 std::vector<std::string> splitByString(std::string text,
                                        std::string_view delimiter = "#//#");
 std::string numberToText(int number, enLanguage language = EN);
+std::string toLower(std::string_view text);
+std::string replaceAll(std::string text, std::string_view stringToReplace,
+                       std::string_view sReplaceTo, bool matchCase = true);
 
 // --- Date & Time (Declarations) ---
 struct stDate {
@@ -106,7 +109,21 @@ size_t ageInDays(stDate birthDate);
 size_t calculateVacationDays(stDate dateFrom, stDate dateTo,
                              bool includeWeekends = false);
 stDate CalculateVacationReturnDate(stDate date, long long vacationDays,
-                                   bool includeWeekends = false);
+                                          bool includeWeekends = false);
+enDateCompare compareDate(stDate d1, stDate d2);
+bool isOverlap(stDate date1From, stDate date1To, stDate date2From,
+               stDate date2To);
+bool isOverlap(stPeriod period1, stPeriod period2);
+long long calculatePeriod(stDate date1, stDate date2,
+                        bool includeLastDay = false);
+long long calculatePeriod(stPeriod period, bool includeLastDay = false);
+bool isDateInPeriod(stDate date, stDate dateStart, stDate dateEnd);
+bool isDateInPeriod(stDate date, stPeriod period);
+std::size_t countOverlapDays(stPeriod period1, stPeriod period2);
+bool isValidDate(stDate date);
+stDate convertToDate(std::string_view dateString);
+std::string dateToString(stDate date, enDateFormat format = enDateFormat::basicFormat);
+std::string dateToString(stDate date, std::string_view format);
 
 // =================================================================================
 //  Numbers
@@ -257,6 +274,7 @@ inline std::vector<std::string> split(std::string_view text, char delimiter) {
   }
   std::string word = "";
   std::vector<std::string> vTokens;
+
   for (auto c : text) {
     if (c != delimiter) {
       word.push_back(c);
@@ -265,9 +283,11 @@ inline std::vector<std::string> split(std::string_view text, char delimiter) {
       word.clear();
     }
   }
+
   if (!word.empty()) {
     vTokens.push_back(word);
   }
+
   return vTokens;
 }
 
@@ -453,6 +473,44 @@ inline std::string numberToText(int number, enLanguage language) {
   }
   }
   return "";
+}
+
+inline std::string toLower(std::string_view text) {
+  std::string s(text);
+  for (char &c : s) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  return s;
+}
+
+inline std::string replaceAll(std::string text,
+                               std::string_view stringToReplace,
+                               std::string_view sReplaceTo,
+                               bool matchCase) {
+  if (stringToReplace.empty() || text.empty()) {
+    return text;
+  }
+
+  size_t pos = 0;
+
+  if (!matchCase) {
+    std::string s1Lower = toLower(text);
+    std::string targetLower = toLower(stringToReplace);
+    std::string replaceLower = toLower(sReplaceTo);
+
+    while ((pos = s1Lower.find(targetLower, pos)) != std::string::npos) {
+      text.replace(pos, stringToReplace.length(), sReplaceTo);
+      s1Lower.replace(pos, stringToReplace.length(), replaceLower);
+      pos += sReplaceTo.length();
+    }
+  } else {
+    while ((pos = text.find(stringToReplace, pos)) != std::string::npos) {
+      text.replace(pos, stringToReplace.length(), sReplaceTo);
+      pos += sReplaceTo.length();
+    }
+  }
+
+  return text;
 }
 
 // =================================================================================
@@ -883,7 +941,8 @@ inline long long daysBetween(stDate date1, stDate date2, bool includeLastDay,
 
 inline long long daysBetween(stPeriod period, bool includeLastDay,
                              bool absoluteDiff) {
-  return daysBetween(period.dateFrom, period.dateTo, includeLastDay, absoluteDiff);
+  return daysBetween(period.dateFrom, period.dateTo, includeLastDay,
+                     absoluteDiff);
 }
 
 inline stDate getSystemDate() {
@@ -934,6 +993,129 @@ inline stDate CalculateVacationReturnDate(stDate date, long long vacationDays,
   }
 
   return dateResult;
+}
+
+inline enDateCompare compareDate(stDate d1, stDate d2) {
+  if (isAfter(d1, d2))
+    return enDateCompare::Date1_After;
+  if (isBefore(d1, d2))
+    return enDateCompare::Date1_Before;
+  return enDateCompare::Date1_Equal;
+}
+
+inline bool isOverlap(stDate date1From, stDate date1To, stDate date2From,
+                      stDate date2To) {
+  return !(isBefore(date1To, date2From) || isBefore(date2To, date1From));
+}
+
+inline bool isOverlap(stPeriod period1, stPeriod period2) {
+  return isOverlap(period1.dateFrom, period1.dateTo, period2.dateFrom,
+                   period2.dateTo);
+}
+
+inline long long calculatePeriod(stDate date1, stDate date2, bool includeLastDay) {
+  return daysBetween(date1, date2, includeLastDay, true);
+}
+
+inline long long calculatePeriod(stPeriod period, bool includeLastDay) {
+  return calculatePeriod(period.dateFrom, period.dateTo, includeLastDay);
+}
+
+inline bool isDateInPeriod(stDate date, stDate dateStart, stDate dateEnd) {
+  return !(isBefore(date, dateStart) || isAfter(date, dateEnd));
+}
+
+inline bool isDateInPeriod(stDate date, stPeriod period) {
+  return isDateInPeriod(date, period.dateFrom, period.dateTo);
+}
+
+inline std::size_t countOverlapDays(stPeriod period1, stPeriod period2) {
+  std::size_t overlapDays = 0;
+
+  std::size_t period1Length = calculatePeriod(period1, true);
+  std::size_t period2Length = calculatePeriod(period2, true);
+
+  if (!isOverlap(period1, period2)) {
+    return 0;
+  }
+
+  if (period1Length > period2Length) {
+    while (isBefore(period2.dateFrom, period2.dateTo)) {
+      if (isDateInPeriod(period2.dateFrom, period1)) {
+        overlapDays++;
+      }
+
+      period2.dateFrom = addUnits(period2.dateFrom, 1);
+    }
+  } else {
+    while (isBefore(period1.dateFrom, period1.dateTo)) {
+      if (isDateInPeriod(period1.dateFrom, period2)) {
+        overlapDays++;
+      }
+
+      period1.dateFrom = addUnits(period1.dateFrom, 1);
+    }
+  }
+
+  return overlapDays;
+}
+
+inline bool isValidDate(stDate date) {
+  return (date.year >= 0) && (date.month >= 1 && date.month <= 12) &&
+         (date.day >= 1 && date.day <= daysInMonth(date.month, date.year));
+}
+
+inline stDate convertToDate(std::string_view dateString) {
+  stDate date{};
+  std::vector<std::string> vDateString = split(dateString, '/');
+
+  if (vDateString.size() != 3) {
+    return date;
+  }
+
+  date.day = static_cast<std::size_t>(std::stoi(vDateString[0]));
+  date.month = static_cast<std::size_t>(std::stoi(vDateString[1]));
+  date.year = static_cast<std::size_t>(std::stoi(vDateString[2]));
+
+  return date;
+}
+
+inline std::string dateToString(stDate date, enDateFormat format) {
+  switch (format) {
+  case enDateFormat::DD_MM_YYYYWithForwaredSlash:
+    return std::to_string(date.day) + "/" + std::to_string(date.month) + "/" +
+           std::to_string(date.year);
+  case enDateFormat::YYYY_MM_DDWithForwaredSlash:
+    return std::to_string(date.year) + "/" + std::to_string(date.month) + "/" +
+           std::to_string(date.day);
+  case enDateFormat::MM_DD_YYYYWithForwaredSlash:
+    return std::to_string(date.month) + "/" + std::to_string(date.day) + "/" +
+           std::to_string(date.year);
+  case enDateFormat::DD_MM_YYYYWithHyphen:
+    return std::to_string(date.day) + "-" + std::to_string(date.month) + "-" +
+           std::to_string(date.year);
+  case enDateFormat::YYYY_MM_DDWithHyphen:
+    return std::to_string(date.year) + "-" + std::to_string(date.month) + "-" +
+           std::to_string(date.day);
+  case enDateFormat::MM_DD_YYYYWithHyphen:
+    return std::to_string(date.month) + "-" + std::to_string(date.day) + "-" +
+           std::to_string(date.year);
+  case enDateFormat::basicFormat:
+    return "Day: " + std::to_string(date.day) + ", Month: " + std::to_string(date.month) +
+           ", Year: " + std::to_string(date.year);
+  }
+
+  return "";
+}
+
+inline std::string dateToString(stDate date, std::string_view format) {
+  std::string result(format);
+
+  result = replaceAll(result, "DD", std::to_string(date.day));
+  result = replaceAll(result, "MM", std::to_string(date.month));
+  result = replaceAll(result, "YYYY", std::to_string(date.year));
+
+  return result;
 }
 
 } // namespace process
