@@ -32,9 +32,9 @@ bool readBool(std::string_view message = "Enter [0]False, [1]True : ",
                   "Error: This is not \"0\" or \"1\" ! try again.\n");
 process::stDate readDate();
 process::stPeriod readPeriod();
-std::string readDateString(
-    std::string_view message = "Enter Date: ",
-    std::string_view errorMessage = "Error: Invalid Date!\n");
+std::string
+readDateString(std::string_view message = "Enter Date: ",
+               std::string_view errorMessage = "Error: Invalid Date!\n");
 
 // =================================================================================
 //  Inputs
@@ -134,7 +134,7 @@ inline process::stPeriod readPeriod() {
 }
 
 inline std::string readDateString(std::string_view message,
-                                 std::string_view errorMessage) {
+                                  std::string_view errorMessage) {
   return readString(message, errorMessage);
 }
 

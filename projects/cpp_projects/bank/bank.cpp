@@ -42,7 +42,7 @@ struct stClientData {
 stClientData convertLineToRecord(string text, string_view delimiter = "#//#") {
   stClientData clientData;
 
-  vector<string> vTokens = splitString(text, delimiter);
+  vector<string> vTokens = splitByString(text, delimiter);
 
   clientData.accountNumber = vTokens[0];
   clientData.pinCode = vTokens[1];
@@ -277,6 +277,14 @@ void updateClientScreen(vector<stClientData> &vClients) {
 }
 
 void deleteClientScreen(vector<stClientData> &vClients) {
+  if (readBool("Do you want to print data of this client before delete it? ")) {
+    printClientsInTableView(vClients);
+
+    system("pause");
+  }
+
+  system("cls");
+
   int indexOfClient = getIndexOfClientByAccountNumber(
       vClients, readString("Enter Account Number: "));
 

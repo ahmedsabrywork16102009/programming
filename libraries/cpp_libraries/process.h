@@ -109,20 +109,21 @@ size_t ageInDays(stDate birthDate);
 size_t calculateVacationDays(stDate dateFrom, stDate dateTo,
                              bool includeWeekends = false);
 stDate CalculateVacationReturnDate(stDate date, long long vacationDays,
-                                          bool includeWeekends = false);
+                                   bool includeWeekends = false);
 enDateCompare compareDate(stDate d1, stDate d2);
 bool isOverlap(stDate date1From, stDate date1To, stDate date2From,
                stDate date2To);
 bool isOverlap(stPeriod period1, stPeriod period2);
 long long calculatePeriod(stDate date1, stDate date2,
-                        bool includeLastDay = false);
+                          bool includeLastDay = false);
 long long calculatePeriod(stPeriod period, bool includeLastDay = false);
 bool isDateInPeriod(stDate date, stDate dateStart, stDate dateEnd);
 bool isDateInPeriod(stDate date, stPeriod period);
 std::size_t countOverlapDays(stPeriod period1, stPeriod period2);
 bool isValidDate(stDate date);
 stDate convertToDate(std::string_view dateString);
-std::string dateToString(stDate date, enDateFormat format = enDateFormat::basicFormat);
+std::string dateToString(stDate date,
+                         enDateFormat format = enDateFormat::basicFormat);
 std::string dateToString(stDate date, std::string_view format);
 
 // =================================================================================
@@ -484,9 +485,8 @@ inline std::string toLower(std::string_view text) {
 }
 
 inline std::string replaceAll(std::string text,
-                               std::string_view stringToReplace,
-                               std::string_view sReplaceTo,
-                               bool matchCase) {
+                              std::string_view stringToReplace,
+                              std::string_view sReplaceTo, bool matchCase) {
   if (stringToReplace.empty() || text.empty()) {
     return text;
   }
@@ -1013,7 +1013,8 @@ inline bool isOverlap(stPeriod period1, stPeriod period2) {
                    period2.dateTo);
 }
 
-inline long long calculatePeriod(stDate date1, stDate date2, bool includeLastDay) {
+inline long long calculatePeriod(stDate date1, stDate date2,
+                                 bool includeLastDay) {
   return daysBetween(date1, date2, includeLastDay, true);
 }
 
@@ -1101,7 +1102,8 @@ inline std::string dateToString(stDate date, enDateFormat format) {
     return std::to_string(date.month) + "-" + std::to_string(date.day) + "-" +
            std::to_string(date.year);
   case enDateFormat::basicFormat:
-    return "Day: " + std::to_string(date.day) + ", Month: " + std::to_string(date.month) +
+    return "Day: " + std::to_string(date.day) +
+           ", Month: " + std::to_string(date.month) +
            ", Year: " + std::to_string(date.year);
   }
 
