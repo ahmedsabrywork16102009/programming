@@ -1,0 +1,80 @@
+# Compiled binaries and objects
+*.exe
+*.out
+*.o
+*.a
+*.so
+*.dll
+*.lib
+*.obj
+*.dmp
+*.stackdump
+core
+core.*
+
+# C++ / Build Output Directories & Files
+build/
+dist/
+out/
+bin/
+CMakeFiles/
+cmake_install.cmake
+CMakeCache.txt
+Makefile
+compile_commands.json
+tempCodeRunnerFile.*
+
+# IDEs and Editors
+.vscode/
+.idea/
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+
+# Temporary, Backup, and Swap files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.#*
+*.orig
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+.venv/
+
+# Logs & Environment
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+.env.local
+
+# Node / JS
+node_modules/
+.npm
+.cache/
+cache/
+.nyc_output/
+coverage/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+.AppleDouble
+.LSOverride
+
+# Archives
+*.zip
+*.rar
+*.7z

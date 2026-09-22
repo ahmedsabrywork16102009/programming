@@ -1,6 +1,4 @@
-#include "../../../libraries/cpp_libraries/enumeration.h"
 #include "../../../libraries/cpp_libraries/input.h"
-#include "../../../libraries/cpp_libraries/output.h"
 #include "../../../libraries/cpp_libraries/process.h"
 
 #include <cstdlib>

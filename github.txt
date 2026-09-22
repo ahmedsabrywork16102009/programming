@@ -1,0 +1,14 @@
+1. One time in project to add a libraries to the project
+git submodule add https://github.com/ahmedsabrywork16102009/libraries.git libraries
+
+2. Pull files from github
+git pull
+git submodule update --init --recursive
+
+3. make this commit is the first
+git checkout --orphan latest_branch
+git add .
+git commit -am "Initial commit"
+git branch -D main
+git branch -m main
+git push -f origin main
