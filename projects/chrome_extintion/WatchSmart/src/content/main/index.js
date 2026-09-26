@@ -1,22 +1,21 @@
 // index.js — MAIN world entry point. esbuild wraps this in an IIFE automatically.
 
-import { applyAntiCheat }  from './anti-cheat.js';
-import { applyIntercepts } from './intercept.js';
-import { captureMedia }    from './tracker.js';
+import { applyAntiCheat }   from './anti-cheat.js';
+import { applyIntercepts }  from './intercept.js';
+import { captureMedia }     from './tracker.js';
 import { startQuantumLoop } from './loop.js';
-import { initBridge }      from './bridge.js';
+import { initBridge }       from './bridge.js';
+import { initAdSkipper }    from './ad-skipper.js';
 
 // 1. Install anti-cheat before any site code can override playbackRate
 applyAntiCheat();
-
 // 2. Intercept dynamic media creation (React, Vue, Angular, etc.)
 applyIntercepts();
-
 // 3. Connect to the isolated world speed broadcaster
 initBridge();
-
 // 4. Capture any media already in the DOM at injection time
 document.querySelectorAll('video, audio').forEach(captureMedia);
-
 // 5. Start the 60fps enforcement loop
 startQuantumLoop();
+// 6. Start the ad skip watcher
+initAdSkipper();

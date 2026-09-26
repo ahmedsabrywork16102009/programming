@@ -1,49 +1,66 @@
-#include "../../../libraries/cpp_libraries/enumeration.h"
 #include "../../../libraries/cpp_libraries/input.h"
-#include "../../../libraries/cpp_libraries/output.h"
 #include "../../../libraries/cpp_libraries/process.h"
 
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <string_view>
-#include <cstdlib>
 
 using namespace std;
-using namespace AS;
 
-// =================================================================================
+// ===========================================================================
 //  Math Game Enums
-// =================================================================================
+// ===========================================================================
 
 enum enQuestionsLevel { Easy = 1, Medium = 2, Hard = 3, MixL = 4 };
 
-// =================================================================================
-//  Math Game Logic
-// =================================================================================
+enum enOperationType {
+  sum = 1,
+  subtract = 2,
+  multiply = 3,
+  divide = 4,
+  mixOp = 5
+};
 
-int calcSum(int a, int b)      { return a + b; }
+// ===========================================================================
+//  Math Game Logic
+// ===========================================================================
+
+int calcSum(int a, int b) { return a + b; }
 int calcSubtract(int a, int b) { return a - b; }
 int calcMultiply(int a, int b) { return a * b; }
-int calcDivide(int a, int b)   { return (b == 0) ? 0 : a / b; }
+int calcDivide(int a, int b) { return (b == 0) ? 0 : a / b; }
 
 int simpleCalculator(int number1, int number2, enOperationType operation) {
   switch (operation) {
-    case enOperationType::sum:      return calcSum(number1, number2);
-    case enOperationType::subtract: return calcSubtract(number1, number2);
-    case enOperationType::multiply: return calcMultiply(number1, number2);
-    case enOperationType::divide:   return calcDivide(number1, number2);
-    case enOperationType::mixOp:    return simpleCalculator(number1, number2, (enOperationType)getRandomNumber(1, 4));
-    default: return 0;
+  case enOperationType::sum:
+    return calcSum(number1, number2);
+  case enOperationType::subtract:
+    return calcSubtract(number1, number2);
+  case enOperationType::multiply:
+    return calcMultiply(number1, number2);
+  case enOperationType::divide:
+    return calcDivide(number1, number2);
+  case enOperationType::mixOp:
+    return simpleCalculator(number1, number2,
+                            (enOperationType)process::randInt(1, 4));
+  default:
+    return 0;
   }
 }
 
 string getOperationSymbol(enOperationType operationType) {
   switch (operationType) {
-    case enOperationType::sum:      return "+";
-    case enOperationType::subtract: return "-";
-    case enOperationType::multiply: return "*";
-    case enOperationType::divide:   return "/";
-    default: return "";
+  case enOperationType::sum:
+    return "+";
+  case enOperationType::subtract:
+    return "-";
+  case enOperationType::multiply:
+    return "*";
+  case enOperationType::divide:
+    return "/";
+  default:
+    return "";
   }
 }
 
@@ -52,9 +69,9 @@ void resetConsole() {
   system("color 0F");
 }
 
-// =================================================================================
+// ===========================================================================
 //  Quiz Structs
-// =================================================================================
+// ===========================================================================
 
 struct stQuestion {
   int number1 = 0;
@@ -76,41 +93,66 @@ struct stQuizz {
   bool isPass = false;
 };
 
-// =================================================================================
+// ===========================================================================
 //  Quiz Setup
-// =================================================================================
+// ===========================================================================
 
 bool doYouWantToPlay() {
-  return readBool("Do you want to play the math game? 1. Yes, 0. No: ");
+  return input::readBool("Do you want to play the math game? 1. Yes, 0. No: ");
 }
 
 int readNumberOfQuestions() {
-  return readNumber<int>("How many questions do you want to answer? (1-100): ", 1, 100);
+  return input::readNumber<int>(
+      "How many questions do you want to answer? (1-100): ", 1, 100);
 }
 
 enQuestionsLevel readQuestionsLevel() {
-  return (enQuestionsLevel)readNumber<int>("Choose the level of questions: 1. Easy, 2. Medium, 3. Hard, 4. Mix: ", 1, 4);
+  return (enQuestionsLevel)input::readNumber<int>(
+      "Choose the level of questions: 1. Easy, 2. Medium, 3. Hard, 4. Mix: ", 1,
+      4);
 }
 
 enOperationType readOperationType() {
-  return (enOperationType)readNumber<int>("Choose the operation type: 1. Add, 2. Subtract, 3. Multiply, 4. Divide, 5. Mix: ", 1, 5);
+  return (enOperationType)input::readNumber<int>(
+      "Choose the operation type: 1. Add, 2. Subtract, 3. Multiply, 4. Divide, "
+      "5. Mix: ",
+      1, 5);
 }
 
-void generateNumbersWithLevel(int &number1, int &number2, enQuestionsLevel questionLevel) {
+void generateNumbersWithLevel(int &number1, int &number2,
+                              enQuestionsLevel questionLevel) {
   switch (questionLevel) {
-    case Easy:   number1 = getRandomNumber(1, 10);  number2 = getRandomNumber(1, 10);  break;
-    case Medium: number1 = getRandomNumber(10, 50); number2 = getRandomNumber(10, 50); break;
-    case Hard:   number1 = getRandomNumber(50, 100); number2 = getRandomNumber(50, 100); break;
-    case MixL:   generateNumbersWithLevel(number1, number2, (enQuestionsLevel)getRandomNumber(1, 3)); break;
+  case Easy:
+    number1 = process::randInt(1, 10);
+    number2 = process::randInt(1, 10);
+    break;
+  case Medium:
+    number1 = process::randInt(10, 50);
+    number2 = process::randInt(10, 50);
+    break;
+  case Hard:
+    number1 = process::randInt(50, 100);
+    number2 = process::randInt(50, 100);
+    break;
+  case MixL:
+    generateNumbersWithLevel(number1, number2,
+                             (enQuestionsLevel)process::randInt(1, 3));
+    break;
   }
 }
 
 stQuestion generateQuestion(stQuizz &quizz) {
   stQuestion question;
-  question.questionLevel = (quizz.questionsLevel == MixL) ? (enQuestionsLevel)getRandomNumber(1, 3) : quizz.questionsLevel;
-  question.operationType = (quizz.operationType == enOperationType::mixOp) ? (enOperationType)getRandomNumber(1, 4) : quizz.operationType;
-  generateNumbersWithLevel(question.number1, question.number2, question.questionLevel);
-  question.correctAnswer = simpleCalculator(question.number1, question.number2, question.operationType);
+  question.questionLevel = (quizz.questionsLevel == MixL)
+                               ? (enQuestionsLevel)process::randInt(1, 3)
+                               : quizz.questionsLevel;
+  question.operationType = (quizz.operationType == enOperationType::mixOp)
+                               ? (enOperationType)process::randInt(1, 4)
+                               : quizz.operationType;
+  generateNumbersWithLevel(question.number1, question.number2,
+                           question.questionLevel);
+  question.correctAnswer = simpleCalculator(question.number1, question.number2,
+                                            question.operationType);
   return question;
 }
 
@@ -119,15 +161,16 @@ void generateQuestions(stQuizz &quizz) {
     quizz.questionsList[i] = generateQuestion(quizz);
 }
 
-// =================================================================================
+// ===========================================================================
 //  Quiz Display & Grading
-// =================================================================================
+// ===========================================================================
 
 void printQuestion(stQuizz quizz, int questionNumber) {
-  cout << "\nQuestion " << questionNumber + 1 << "/" << quizz.numberOfQuestions << ":\n";
+  cout << "\nQuestion " << questionNumber + 1 << "/" << quizz.numberOfQuestions
+       << ":\n";
   cout << quizz.questionsList[questionNumber].number1 << " "
-       << getOperationSymbol(quizz.questionsList[questionNumber].operationType) << " "
-       << quizz.questionsList[questionNumber].number2 << " = ";
+       << getOperationSymbol(quizz.questionsList[questionNumber].operationType)
+       << " " << quizz.questionsList[questionNumber].number2 << " = ";
 }
 
 void changeScreenColor(bool isCorrect) {
@@ -138,8 +181,10 @@ void askAndCorrectQuestionListAnswers(stQuizz &quizz) {
   for (int i = 0; i < quizz.numberOfQuestions; i++) {
     resetConsole();
     printQuestion(quizz, i);
-    quizz.questionsList[i].userAnswer = readNumber<int>("\nYour answer: ");
-    if (quizz.questionsList[i].userAnswer == quizz.questionsList[i].correctAnswer) {
+    quizz.questionsList[i].userAnswer =
+        input::readNumber<int>("\nYour answer: ");
+    if (quizz.questionsList[i].userAnswer ==
+        quizz.questionsList[i].correctAnswer) {
       quizz.questionsList[i].isCorrect = true;
       quizz.numberOfCorrectAnswers++;
     } else {
@@ -151,10 +196,12 @@ void askAndCorrectQuestionListAnswers(stQuizz &quizz) {
   quizz.isPass = quizz.numberOfCorrectAnswers >= quizz.numberOfWrongAnswers;
 }
 
-string getFinalGameText(bool isPass) { return isPass ? "Pass :-)" : "Fail :-("; }
+string getFinalGameText(bool isPass) {
+  return isPass ? "Pass :-)" : "Fail :-(";
+}
 
 string getQuestionLevelText(enQuestionsLevel level) {
-  string arr[] = { "Easy", "Medium", "Hard", "Mix" };
+  string arr[] = {"Easy", "Medium", "Hard", "Mix"};
   return arr[level - 1];
 }
 
@@ -163,7 +210,8 @@ void printQuizzResult(stQuizz quizz) {
   cout << "Final Result: " << getFinalGameText(quizz.isPass) << "\n";
   cout << "==========================================\n";
   cout << "Total Questions: " << quizz.numberOfQuestions << "\n";
-  cout << "Questions Level: " << getQuestionLevelText(quizz.questionsLevel) << "\n";
+  cout << "Questions Level: " << getQuestionLevelText(quizz.questionsLevel)
+       << "\n";
   cout << "Operation Type: " << getOperationSymbol(quizz.operationType) << "\n";
   cout << "Correct Answers: " << quizz.numberOfCorrectAnswers << "\n";
   cout << "Wrong Answers: " << quizz.numberOfWrongAnswers << "\n";
@@ -190,9 +238,9 @@ void startGame() {
   } while (playAgain);
 }
 
-// =================================================================================
+// ===========================================================================
 //  Main
-// =================================================================================
+// ===========================================================================
 
 int main() {
   srand((unsigned int)(time(NULL)));
