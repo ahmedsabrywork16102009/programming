@@ -10,7 +10,6 @@
 #include <vector>
 
 using namespace std;
-using namespace AS;
 
 enum enChoice {
   eShowClientList = 1,
@@ -40,7 +39,7 @@ struct stClientData {
 stClientData convertLineToRecord(string text, string_view delimiter = "#//#") {
   stClientData clientData;
 
-  vector<string> vTokens = splitByString(text, delimiter);
+  vector<string> vTokens = process::splitByString(text, delimiter);
 
   clientData.accountNumber = vTokens[0];
   clientData.pinCode = vTokens[1];
@@ -153,13 +152,14 @@ stClientData readNewClient(vector<stClientData> &vClients) {
     }
     isRepeated = true;
 
-    clientData.accountNumber = readString("Enter Account Number: ");
+    clientData.accountNumber = input::readString("Enter Account Number: ");
   } while (isClientFound(vClients, clientData.accountNumber));
 
-  clientData.pinCode = readString("Enter Pin Code: ");
-  clientData.fullName = readString("Enter Full Name: ");
-  clientData.phone = readString("Enter Phone: ");
-  clientData.accountBalance = readNumber<double>("Enter Account Balance: ");
+  clientData.pinCode = input::readString("Enter Pin Code: ");
+  clientData.fullName = input::readString("Enter Full Name: ");
+  clientData.phone = input::readString("Enter Phone: ");
+  clientData.accountBalance =
+      input::readNumber<double>("Enter Account Balance: ");
 
   return clientData;
 }
@@ -167,26 +167,27 @@ stClientData readNewClient(vector<stClientData> &vClients) {
 bool updateClientData(stClientData &clientData) {
   printClientDataVertical(clientData);
 
-  if (readBool(
+  if (input::readBool(
           "Are you sure you want to update this client [1] Yes [0] No: ")) {
-    if (readBool("Do you want to update account number? ")) {
-      clientData.accountNumber = readString("Enter Account Number: ");
+    if (input::readBool("Do you want to update account number? ")) {
+      clientData.accountNumber = input::readString("Enter Account Number: ");
     }
 
-    if (readBool("Do you want to update pin code? ")) {
-      clientData.pinCode = readString("Enter Pin Code: ");
+    if (input::readBool("Do you want to update pin code? ")) {
+      clientData.pinCode = input::readString("Enter Pin Code: ");
     }
 
-    if (readBool("Do you want to update full name? ")) {
-      clientData.fullName = readString("Enter Full Name: ");
+    if (input::readBool("Do you want to update full name? ")) {
+      clientData.fullName = input::readString("Enter Full Name: ");
     }
 
-    if (readBool("Do you want to update phone? ")) {
-      clientData.phone = readString("Enter Phone: ");
+    if (input::readBool("Do you want to update phone? ")) {
+      clientData.phone = input::readString("Enter Phone: ");
     }
 
-    if (readBool("Do you want to update account balance? ")) {
-      clientData.accountBalance = readNumber<double>("Enter Account Balance: ");
+    if (input::readBool("Do you want to update account balance? ")) {
+      clientData.accountBalance =
+          input::readNumber<double>("Enter Account Balance: ");
     }
     return true;
   }
@@ -203,7 +204,7 @@ bool deleteClient(vector<stClientData> &vClients, const string &accountNumber) {
 
   printClientDataVertical(vClients, indexOfClient);
 
-  if (readBool(
+  if (input::readBool(
           "Are you sure you want to delete this client [1] Yes [0] No: ")) {
     vClients.erase(vClients.begin() + indexOfClient);
     cout << "Client Deleted Successfully!\n";
@@ -256,14 +257,15 @@ void printClientsInTableView(const vector<stClientData> &vClients) {
 void addNewClientScreen(vector<stClientData> &vClients) {
   do {
     vClients.push_back(readNewClient(vClients));
-  } while (readBool("Do you want to add another client [1-Yes] [0-No]: "));
+  } while (
+      input::readBool("Do you want to add another client [1-Yes] [0-No]: "));
 
   system("pause");
 }
 
 void updateClientScreen(vector<stClientData> &vClients) {
   int indexOfClient = getIndexOfClientByAccountNumber(
-      vClients, readString("Enter Account Number: "));
+      vClients, input::readString("Enter Account Number: "));
 
   if (indexOfClient != -1) {
     updateClientData(vClients[indexOfClient]);
@@ -275,7 +277,8 @@ void updateClientScreen(vector<stClientData> &vClients) {
 }
 
 void deleteClientScreen(vector<stClientData> &vClients) {
-  if (readBool("Do you want to print data of this client before delete it? ")) {
+  if (input::readBool(
+          "Do you want to print data of this client before delete it? ")) {
     printClientsInTableView(vClients);
 
     system("pause");
@@ -284,7 +287,7 @@ void deleteClientScreen(vector<stClientData> &vClients) {
   system("cls");
 
   int indexOfClient = getIndexOfClientByAccountNumber(
-      vClients, readString("Enter Account Number: "));
+      vClients, input::readString("Enter Account Number: "));
 
   if (indexOfClient != -1) {
     deleteClient(vClients, vClients[indexOfClient].accountNumber);
@@ -298,7 +301,7 @@ void deleteClientScreen(vector<stClientData> &vClients) {
 void findClientScreen(vector<stClientData> &vClients) {
   printFindResult(vClients,
                   getIndexOfClientByAccountNumber(
-                      vClients, readString("Enter Account Number: ")));
+                      vClients, input::readString("Enter Account Number: ")));
 
   system("pause");
 }
@@ -327,7 +330,7 @@ void deposit(vector<stClientData> &vClients, int indexOfClient,
 
 void depositScreen(vector<stClientData> &vClients) {
   int indexOfClient = getIndexOfClientByAccountNumber(
-      vClients, readString("Enter Account Number: "));
+      vClients, input::readString("Enter Account Number: "));
 
   double depositValue = 0;
   bool isFirstTime = 1;
@@ -339,10 +342,10 @@ void depositScreen(vector<stClientData> &vClients) {
       isFirstTime = 0;
     }
 
-    depositValue = readNumber<double>("Enter deposit value: ", 0.0,
-                                      std::numeric_limits<double>::max());
+    depositValue = input::readNumber<double>(
+        "Enter deposit value: ", 0.0, std::numeric_limits<double>::max());
 
-    if (readBool(
+    if (input::readBool(
             "Are you sure you want to deposit this client [1] Yes [0] No: ")) {
       deposit(vClients, indexOfClient, depositValue);
       cout << "\nClient Deposit Successfully!\n";
@@ -369,7 +372,7 @@ bool isClientHasEnoughBalance(vector<stClientData> &vClients, int indexOfClient,
 
 void withdrawScreen(vector<stClientData> &vClients) {
   int indexOfClient = getIndexOfClientByAccountNumber(
-      vClients, readString("Enter Account Number: "));
+      vClients, input::readString("Enter Account Number: "));
 
   double withdrawValue = 0;
   bool hasEnoughBalance = 0;
@@ -383,8 +386,8 @@ void withdrawScreen(vector<stClientData> &vClients) {
         isFirstTime = 0;
       }
 
-      withdrawValue = readNumber<double>("Enter withdraw value: ", 0.0,
-                                         std::numeric_limits<double>::max());
+      withdrawValue = input::readNumber<double>(
+          "Enter withdraw value: ", 0.0, std::numeric_limits<double>::max());
 
       if ((hasEnoughBalance = isClientHasEnoughBalance(vClients, indexOfClient,
                                                        withdrawValue))) {
@@ -475,7 +478,7 @@ void transactionsScreen(vector<stClientData> &vClients) {
     printTransactionsMenueScreen();
 
     choise = static_cast<enTransactions>(
-        readNumber<int>("Enter your choise: ", 1, 4));
+        input::readNumber<int>("Enter your choise: ", 1, 4));
 
     handleTransactionsMenuChoice(choise, vClients);
   } while (choise != enTransactions::eBackMainMenu);
@@ -531,8 +534,8 @@ int main() {
 
     printMainMenueScreen();
 
-    choise =
-        static_cast<enChoice>(readNumber<int>("Enter your choise: ", 1, 7));
+    choise = static_cast<enChoice>(
+        input::readNumber<int>("Enter your choise: ", 1, 7));
 
     handleMainMenuChoice(choise, vClients);
   } while (choise != enChoice::eExit);

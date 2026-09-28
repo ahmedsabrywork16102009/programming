@@ -1,4 +1,3 @@
-#include "../../../libraries/cpp_libraries/enumeration.h"
 #include "../../../libraries/cpp_libraries/input.h"
 #include "../../../libraries/cpp_libraries/output.h"
 #include "../../../libraries/cpp_libraries/process.h"
@@ -12,7 +11,6 @@
 #include <vector>
 
 using namespace std;
-using namespace AS;
 
 // =================================================================================
 //  Enums & Structs
@@ -102,15 +100,15 @@ void printGameResults(const stGameInfo &gameInfo) {
 
 stGameInfo playGame() {
   stGameInfo gameInfo;
-  gameInfo.numberOfRounds = readNumber<int>("How many rounds you want to play: ");
+  gameInfo.numberOfRounds = input::readNumber<int>("How many rounds you want to play: ");
   gameInfo.roundsInfo.resize(gameInfo.numberOfRounds);
 
   for (int i = 0; i < gameInfo.numberOfRounds; i++) {
     gameInfo.roundsInfo[i].roundNumber = i + 1;
-    gameInfo.roundsInfo[i].playerChoice = static_cast<enChoice>(readNumber<int>(
+    gameInfo.roundsInfo[i].playerChoice = static_cast<enChoice>(input::readNumber<int>(
         "What is your choice \n[1] : Rock, \n[2] : Paper, \n[3] : Scissor "
         "\nYour Choice: ", 1, 3));
-    gameInfo.roundsInfo[i].computerChoice = static_cast<enChoice>(getRandomNumber(1, 3));
+    gameInfo.roundsInfo[i].computerChoice = static_cast<enChoice>(process::randInt(1, 3));
     gameInfo.roundsInfo[i].RoundWinner = getWinner(gameInfo.roundsInfo[i].playerChoice,
                                                    gameInfo.roundsInfo[i].computerChoice);
     gameInfo.roundsInfo[i].winnerName = getWinnerName(gameInfo.roundsInfo[i].RoundWinner);
@@ -142,9 +140,9 @@ stGameInfo playGame() {
 void startGame() {
   bool playAgain = true;
   do {
-    resetScreen();
+    output::resetScreen();
     printGameResults(playGame());
-    playAgain = readBool("Do you want to play again?\n");
+    playAgain = input::readBool("Do you want to play again?\n");
   } while (playAgain);
 }
 
