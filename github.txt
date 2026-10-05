@@ -17,3 +17,7 @@ git push -f origin main
 معرفة التغيير اللي حصل في الملفات
 git add .
 git --no-pager diff HEAD
+
+أنا عملت تعديلات في المشروع، ودي مخرجات الـ git diff. عايزك تحللها وتطلع لي أمر واحد فقط جاهز للنسخ والتنفيذ مباشرة بنفس الصيغة دي بالظبط: git commit -m "type(scope): summary of changes"  الشروط: 1. استخدم نظام Conventional Commits (مثل: feat, fix, refactor, docs, chore). 2. حدد الـ scope بين القوسين بناءً على الميزة أو المشروع الرئيس في التعديلات. 3. السطر يكون One-liner مباشر يجمع الـ Commit والـ Push بـ &&. 4. لا تكتب أي شرح أو مقدمات قبل أو بعد الأمر، هاته جاهز للنسخ فقط.  مخرجات الـ diff: 
+
+git push
