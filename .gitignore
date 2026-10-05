@@ -10,7 +10,7 @@
 *.dmp
 *.stackdump
 core
-core.*
+core.[0-9]*
 
 # C++ / Build Output Directories & Files
 build/

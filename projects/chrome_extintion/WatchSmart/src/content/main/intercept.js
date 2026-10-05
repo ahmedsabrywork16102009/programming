@@ -15,13 +15,12 @@ export function applyIntercepts() {
         return el;
     };
 
-    EventTarget.prototype.addEventListener = function () {
+    EventTarget.prototype.addEventListener = function (type) {
         if (this instanceof HTMLMediaElement) captureMedia(this);
         try {
             return _addEventListener.apply(this, arguments);
         } catch (e) {
-            // Silently swallow Permissions-Policy violations (e.g. 'unload')
-            // that originate from site code but surface through our patch.
+            // Silently swallow Permissions-Policy violations (e.g. 'unload' on restricted pages)
         }
     };
 }
