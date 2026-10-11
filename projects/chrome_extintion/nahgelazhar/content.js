@@ -15,6 +15,7 @@
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
   let restoring = true; // مقفول لحد ما الاسترجاع يخلص
+  let sorting = false;  // علشان الـ observer ميعملش loop وقت الترتيب
   let settings = Object.assign({ hide: false, exclude: false }, read(SETTINGS_KEY, {}));
   const cache = read(CACHE_KEY, {});
 
@@ -57,6 +58,55 @@
       else tags.push('other');
     }
     return tags;
+  }
+
+  // ---------- ترتيب الدروس جوا الوحدة ----------
+  // 0 قبلي | 1 شرح فيديو | 2 سبورة | 3 ملفات الشرح | 4 غير مصنف
+  // 5 فيديو حل/واجب | 6 ملف واجب/حل | 7 بعدي | 8 شامل
+  function rank(unitName, name, type) {
+    const isComp = unitName.includes('شامل') || name.includes('شامل');
+    if (type === 'اختبار') {
+      if (isComp) return 8;
+      if (name.includes('قبل')) return 0;
+      return 7;
+    }
+    if (type === 'فيديو') {
+      return name.includes('حل') || name.includes('واجب') ? 5 : 1;
+    }
+    if (type === 'ملف') {
+      if (name.includes('سبورة')) return 2;
+      if (name.includes('واجب') || name.includes('حل')) return 6;
+      return 3;
+    }
+    return 4;
+  }
+
+  function lessonType(b) {
+    const img = b.querySelector('img');
+    const alt = norm(img && img.alt);
+    if (alt) return alt;
+    return ['فيديو', 'ملف', 'اختبار'].find((t) => b.textContent.includes(t)) || '';
+  }
+
+  function sortLessons(unit) {
+    const lessons = Array.from(unitCard(unit).querySelectorAll('button'))
+      .filter((b) => b !== unit && b.querySelector('h4'));
+    if (lessons.length < 2) return;
+    const box = lessons[0].parentElement;
+    const btns = lessons.filter((b) => b.parentElement === box);
+    if (btns.length < 2) return;
+    const title = unitTitle(unit);
+    const items = btns.map((b, i) => {
+      const h4 = b.querySelector('h4');
+      return { b, i, r: rank(title, norm(h4 && h4.textContent), lessonType(b)) };
+    });
+    items.sort((x, y) => x.r - y.r || x.i - y.i);
+    const same = items.every((it, idx) => it.b === btns[idx]);
+    if (same) return;
+    sorting = true;
+    items.forEach((it) => box.appendChild(it.b));
+    log('Sorted lessons in:', title);
+    setTimeout(() => { sorting = false; }, 0);
   }
 
   function collect() {
@@ -195,21 +245,21 @@
   }
 
   function save() {
-  if (restoring) return;
-  const units = getUnits();
-  if (!units.length) return; // مش في صفحة القائمة: متكتبش حاجة
-  const open = openUnits();
-  if (open.length > 1) return;
-  const anchor = anchorInfo();
-  write(KEY, {
-    open: open.length === 1,
-    unit: open.length === 1 ? unitTitle(open[0]) : null,
-    a: anchor ? anchor.a : null,
-    off: anchor ? anchor.off : 0,
-    y: Math.round(window.scrollY),
-  });
-  if (open.length === 1) write(LAST_KEY, unitTitle(open[0]));
-}
+    if (restoring) return;
+    const units = getUnits();
+    if (!units.length) return; // مش في صفحة القائمة: متكتبش حاجة
+    const open = openUnits();
+    if (open.length > 1) return;
+    const anchor = anchorInfo();
+    write(KEY, {
+      open: open.length === 1,
+      unit: open.length === 1 ? unitTitle(open[0]) : null,
+      a: anchor ? anchor.a : null,
+      off: anchor ? anchor.off : 0,
+      y: Math.round(window.scrollY),
+    });
+    if (open.length === 1) write(LAST_KEY, unitTitle(open[0]));
+  }
 
   function scrollToSaved(saved) {
     const u = saved.a ? findUnit(saved.a) : null;
@@ -257,6 +307,7 @@
       if (u) {
         u.click();
         await waitFor(() => unitCard(u).querySelector(':scope > div button'));
+        sortLessons(u);
         await sleep(100);
       }
     }
@@ -347,7 +398,7 @@
             setTimeout(save, 600);
           }, 100);
         }, 30);
-        setTimeout(refresh, 400);
+        setTimeout(() => { sortLessons(btn); refresh(); }, 400);
       } else {
         setTimeout(save, 200);
       }
@@ -361,38 +412,39 @@
 
   // ---------- استرجاع المكان ----------
   async function restore(units) {
-  restoring = true;
-  try {
-    const saved = read(KEY, null);
-    log('Saved state:', saved);
+    restoring = true;
+    try {
+      const saved = read(KEY, null);
+      log('Saved state:', saved);
 
-    let keep = saved && saved.open ? units.find((u) => unitTitle(u) === saved.unit) : null;
-    if (keep && settings.hide && isLit(unitTitle(keep))) keep = null;
+      let keep = saved && saved.open ? units.find((u) => unitTitle(u) === saved.unit) : null;
+      if (keep && settings.hide && isLit(unitTitle(keep))) keep = null;
 
-    let n = 0;
-    units.forEach((u) => { if (u !== keep && isOpen(u)) { u.click(); n++; } });
-    log(`Units: ${units.length}, collapsed: ${n}`);
+      let n = 0;
+      units.forEach((u) => { if (u !== keep && isOpen(u)) { u.click(); n++; } });
+      log(`Units: ${units.length}, collapsed: ${n}`);
 
-    if (keep) {
-      if (!isOpen(keep)) keep.click();
-      await waitFor(() => openUnits().length === 1 && unitCard(keep).querySelector(':scope > div button'));
-    } else {
-      await waitFor(() => openUnits().length === 0);
+      if (keep) {
+        if (!isOpen(keep)) keep.click();
+        await waitFor(() => openUnits().length === 1 && unitCard(keep).querySelector(':scope > div button'));
+        sortLessons(keep);
+      } else {
+        await waitFor(() => openUnits().length === 0);
+      }
+
+      if (saved) {
+        await sleep(200);
+        scrollToSaved(saved);
+        log('Restored:', saved);
+        await sleep(400);
+        scrollToSaved(saved); // تثبيت تاني بعد ما الصفحة تستقر
+      }
+      await sleep(300);
+    } finally {
+      restoring = false;
+      updateFab();
     }
-
-    if (saved) {
-      await sleep(200);
-      scrollToSaved(saved);
-      log('Restored:', saved);
-      await sleep(400);
-      scrollToSaved(saved); // تثبيت تاني بعد ما الصفحة تستقر
-    }
-    await sleep(300);
-  } finally {
-    restoring = false;
-    updateFab();
   }
-}
 
   function process() {
     const units = getUnits();
@@ -409,15 +461,23 @@
 
   let timer = null;
   new MutationObserver((muts) => {
+    if (sorting) return;
     const card = document.getElementById('nahj-stats');
     if (muts.every((m) => (card && card.contains(m.target)) || m.target === fab)) return;
     clearTimeout(timer);
     timer = setTimeout(() => {
       process();
+      openUnits().forEach(sortLessons);
       if (getUnits().length && !document.getElementById('nahj-stats')) refresh();
       updateFab();
     }, 300);
   }).observe(document.documentElement, { childList: true, subtree: true });
+
+  // تأمين: يرتب الوحدة المفتوحة كل شوية لو React رجّع الترتيب القديم
+  setInterval(() => {
+    if (restoring) return;
+    openUnits().forEach(sortLessons);
+  }, 700);
 
   process();
 })();

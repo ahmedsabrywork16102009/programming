@@ -27,5 +27,7 @@ int main() {
 
   cout << dateToString(date) << "\n";
 
+  std::cout << "\U0001F600" << std::endl;
+
   return 0;
 }
