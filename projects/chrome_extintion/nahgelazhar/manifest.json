@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "مساعد نهج",
-  "short_name": "نهج",
+  "name": "Nahgelazhar helper",
+  "short_name": "Nahgelazhar",
   "version": "2.0",
-  "description": "إحصائيات التقدم وعرض الدروس جوا الصفحة لمنصة نهج الأزهر.",
+  "description": "Progress stats and inline lessons for the Nahgelazhar platform.",
   "permissions": ["storage"],
   "host_permissions": ["https://nahgelazhar.com/*"],
   "icons": {
@@ -12,7 +12,7 @@
     "128": "assets/icons/icon.png"
   },
   "action": {
-    "default_title": "مساعد نهج",
+    "default_title": "Nahgelazhar helper",
     "default_popup": "src/popup/popup.html",
     "default_icon": "assets/icons/icon.png"
   },
