@@ -16,8 +16,6 @@ git push -f origin main
 
 معرفة التغيير اللي حصل في الملفات
 git add .
-git --no-pager diff HEAD
+git --no-pager diff HEAD > diff_output.txt
 
-حلل الـ git diff دا وطلّعلي أمر commit بـ Conventional Commits ووراها git push في سطرين بدون أي شرح أو كلام إضافي:
-
-git push
+Analyze this git diff and output only a commit command in Conventional Commits followed by git push, in two lines inside a code block, no explanation.

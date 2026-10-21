@@ -1,15 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "نهج الأزهر - تحسين عرض المحاضرات وحفظ الموقع",
-  "version": "1.1",
-  "description": "إضافة لطي جميع محاضرات منصة نهج الأزهر تلقائياً وحفظ موضع التصفح والوحدة المفتوحة.",
-  "host_permissions": [
-    "https://nahgelazhar.com/*"
-  ],
+  "name": "مساعد نهج",
+  "short_name": "نهج",
+  "version": "2.0",
+  "description": "إحصائيات التقدم وعرض الدروس جوا الصفحة لمنصة نهج الأزهر.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://nahgelazhar.com/*"],
+  "icons": {
+    "16": "assets/icons/icon.png",
+    "48": "assets/icons/icon.png",
+    "128": "assets/icons/icon.png"
+  },
+  "action": {
+    "default_title": "مساعد نهج",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": "assets/icons/icon.png"
+  },
   "content_scripts": [
     {
       "matches": ["https://nahgelazhar.com/*"],
-      "js": ["content.js"],
+      "js": ["src/content.js"],
       "run_at": "document_end"
     }
   ]
