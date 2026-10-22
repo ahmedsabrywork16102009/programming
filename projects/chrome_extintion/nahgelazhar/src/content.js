@@ -15,9 +15,10 @@
 
   // ===== الإعدادات (محفوظة في chrome.storage عشان نافذة الإضافة تتحكم فيها) =====
   const settings = {
-    hide: false, exclude: false, sort: true, inline: true, dropHidden: true,
-    hiddenSubs: [], hideDone: false, hiddenTypes: []
-  };
+  hide: false, exclude: false, sort: true, inline: true, dropHidden: true,
+  showEmpty: false, folded: false,
+  hiddenSubs: [], hideDone: false, hiddenTypes: []
+};
   function saveSettings() {
     try { chrome.storage.local.set({ [SETTINGS_KEY]: settings }); } catch (_) { write(SETTINGS_KEY, settings); }
   }
@@ -34,6 +35,7 @@
   let busy = false, cancelScan = false, userMoved = false, skipRestoreOnce = false;
   let openSet = null;                     // null = آخر وحدة تلقائياً | Set بأسماء الوحدات المفتوحة
   let statsOpen = null;                   // الصف المفتوح في الإحصائيات
+  let active = false;                     // الإضافة شغالة على الكورس الحالي؟
   let fab = null, fabSide = read(FAB_KEY, 'right'), timer = null, raf = 0;
 
   // ===== المواد =====
@@ -70,6 +72,27 @@
     return { title: norm(h1.textContent), btns };
   }
   function syncMode() { viewMode = unitPage() ? 'unit' : (getUnits().length ? 'list' : 'other'); }
+  // ===== تحديد الكورس المستهدف =====
+const COURSE_ID = '4c086b90-30b2-44cc-a5f9-d2f74a4c3448';
+const COURSE_KEYS = ['مواد عربية', 'الثالث الثانوي'];
+function isTargetCourse() {
+  if (location.pathname.includes(COURSE_ID)) return true;
+  const sec = mainEl().querySelector('section');
+  if (!sec) return false;
+  const t = nrm(sec.textContent);
+  return COURSE_KEYS.every(k => t.includes(nrm(k)));
+}
+function cleanup() {                              // لما نخرج من الكورس: شيل كل أثرنا
+  const c = document.getElementById('nahj-stats');
+  if (c) c.remove();
+  closePanels();
+  getUnits().forEach(u => {
+    const card = unitCard(u);
+    card.style.display = ''; card.style.outline = ''; card.style.outlineOffset = '';
+  });
+  mountedHost = null; lastBox = null; lastSig = '';
+  if (fab) fab.style.display = 'none';
+}
 
   function waitFor(fn, timeout = 1500) {
     return new Promise(resolve => {
@@ -453,12 +476,14 @@
   }
 
   function render() {
-    const card = document.getElementById('nahj-stats');
-    if (!card) return;
-    const s = computeStats();
-    const partial = s.scanned < s.nUnits;
+  const card = document.getElementById('nahj-stats');
+  if (!card) return;
+  const s = computeStats();
+  const partial = s.scanned < s.nUnits, folded = settings.folded;
 
-    const chips = SUBJECTS.map(([id, l]) => {
+  const chips = SUBJECTS
+    .filter(([id]) => s.subs[id].t > 0 || settings.showEmpty || settings.hiddenSubs.includes(id))
+    .map(([id, l]) => {
       const o = s.subs[id], on = !settings.hiddenSubs.includes(id), open = statsOpen === 's:' + id;
       return `<div data-exp="s:${id}" class="border border-green-200/70${open ? ' bg-green-50' : ''}" style="flex:1 0 108px;display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:12px;cursor:pointer;${on ? '' : 'opacity:.5;border-style:dashed;'}">` +
         vbar(pct(o)) +
@@ -466,7 +491,9 @@
         eyeBtn('s:' + id, on) + '</div>';
     }).join('');
 
-    const rows = CARDS.filter(c => s[c[0]].t > 0 || c[0] !== 'other').map(([k, i, l]) => {
+  const rows = CARDS
+    .filter(([k]) => k === 'units' || s[k].t > 0 || settings.showEmpty || settings.hiddenTypes.includes(k))
+    .map(([k, i, l]) => {
       const o = s[k], key = k === 'units' ? 'u' : 't:' + k;
       const on = k === 'units' ? !settings.hideDone : !settings.hiddenTypes.includes(k);
       const open = statsOpen === key;
@@ -479,20 +506,28 @@
         (open ? namesBox(key) : '') + '</div>';
     }).join('');
 
-    card.innerHTML =
-      `<button type="button" data-act="copy" class="bg-white border border-green-200/70 text-green-800" style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;border-radius:999px;padding:5px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.08)">${ic('copy', 15)}<span data-copy-label>نسخ الإحصائيات</span></button>` +
-      `<div style="padding:22px 18px 10px">` +
-      `<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">` +
-      `<div style="display:flex;align-items:center;gap:8px"><span class="text-green-800 font-thmanyah" style="font-size:16px;font-weight:700">إحصائيات تقدمك</span><span class="bg-gold-50 text-gold-700 border border-gold-200" style="font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px">${pct(s.all)}% من الدروس</span></div>` +
-      `<div style="display:flex;gap:6px">${actBtn('scan', 'refresh', 'تحديث الدروس')}${actBtn('showall', 'eye', 'إظهار الكل')}</div></div>` +
-      `<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:6px"><span class="text-green-900">${s.units.d} وحدة مكتملة من ${s.units.t}</span><span class="text-gray-500">${pct(s.units)}%</span></div>` +
-      hbar(pct(s.units), 8) +
-      `<div class="text-gray-500" style="font-size:12px;font-weight:700;margin:16px 0 8px">المواد</div>` +
-      `<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px">${chips}</div>` +
-      (statsOpen && statsOpen.startsWith('s:') ? `<div style="margin-top:8px">${namesBox(statsOpen)}</div>` : '') +
-      `<div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 4px"><span class="text-gray-500" style="font-size:12px;font-weight:700">الأنواع</span>${partial ? `<span class="text-gold-700" style="font-size:12px">محسوبة من ${s.scanned} وحدة من ${s.nUnits} — اضغط «تحديث الدروس»</span>` : ''}</div>` +
-      rows + '</div>';
-  }
+  const foldBtn = `<button type="button" data-act="fold" title="${folded ? 'فتح الإحصائيات' : 'طي الإحصائيات'}" class="border border-green-200/70 text-green-800" style="display:flex;padding:4px;border-radius:8px;cursor:pointer;background:transparent;transition:transform .2s;${folded ? '' : 'transform:rotate(180deg)'}">${ic('down', 16)}</button>`;
+
+  const header =
+    `<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">` +
+    `<div style="display:flex;align-items:center;gap:8px">${foldBtn}<span class="text-green-800 font-thmanyah" style="font-size:16px;font-weight:700">إحصائيات تقدمك</span><span class="bg-gold-50 text-gold-700 border border-gold-200" style="font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px">${pct(s.all)}% من الدروس</span></div>` +
+    (folded ? '' : `<div style="display:flex;gap:6px">${actBtn('scan', 'refresh', 'تحديث الدروس')}${actBtn('showall', 'eye', 'إظهار الكل')}</div>`) +
+    `</div>`;
+
+  const summary =
+    `<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:6px"><span class="text-green-900">${s.units.d} وحدة مكتملة من ${s.units.t}</span><span class="text-gray-500">${pct(s.units)}%</span></div>` +
+    hbar(pct(s.units), 8);
+
+  const details = folded ? '' :
+    (chips ? `<div class="text-gray-500" style="font-size:12px;font-weight:700;margin:16px 0 8px">المواد</div><div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px">${chips}</div>` : '') +
+    (statsOpen && statsOpen.startsWith('s:') ? `<div style="margin-top:8px">${namesBox(statsOpen)}</div>` : '') +
+    `<div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 4px"><span class="text-gray-500" style="font-size:12px;font-weight:700">الأنواع</span>${partial ? `<span class="text-gold-700" style="font-size:12px">محسوبة من ${s.scanned} وحدة من ${s.nUnits} — اضغط «تحديث الدروس»</span>` : ''}</div>` +
+    rows;
+
+  card.innerHTML =
+    `<button type="button" data-act="copy" class="bg-white border border-green-200/70 text-green-800" style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;border-radius:999px;padding:5px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.08)">${ic('copy', 15)}<span data-copy-label>نسخ الإحصائيات</span></button>` +
+    `<div style="padding:22px 18px ${folded ? 14 : 10}px">` + header + summary + details + '</div>';
+}
 
   function statsText() {
     const s = computeStats();
@@ -539,40 +574,41 @@
   }
 
   function ensureCard() {
-    if (document.getElementById('nahj-stats')) return;
-    const qa = document.getElementById('teacher-qa-heading'), target = qa && qa.closest('section');
-    if (!target) return;
-    const sec = document.createElement('section');
-    sec.id = 'nahj-stats';
-    sec.setAttribute('data-nahj', '');
-    sec.className = 'bg-white rounded-2xl border border-green-200/70 shadow-md shadow-green-900/10 mb-5 sm:mb-7';
-    sec.style.cssText = 'position:relative;margin-top:24px';
+  if (document.getElementById('nahj-stats')) return;
+  const qa = document.getElementById('teacher-qa-heading'), target = qa && qa.closest('section');
+  if (!target) return;
+  const sec = document.createElement('section');
+  sec.id = 'nahj-stats';
+  sec.setAttribute('data-nahj', '');
+  sec.className = 'bg-white rounded-2xl border border-green-200/70 shadow-md shadow-green-900/10 mb-5 sm:mb-7';
+  sec.style.cssText = 'position:relative;margin-top:24px';
 
-    sec.addEventListener('click', async e => {
-      const t = e.target;
-      if (!t.closest) return;
-      const eye = t.closest('[data-eye]');
-      if (eye) { toggleEye(eye.getAttribute('data-eye')); return; }
-      const act = t.closest('[data-act]');
-      if (act) {
-        const a = act.getAttribute('data-act');
-        if (a === 'scan') scanAll(act);
-        else if (a === 'showall') {
-          settings.hiddenSubs = []; settings.hiddenTypes = []; settings.hideDone = false;
-          saveSettings(); applyHide(); syncPanels(); render();
-        } else if (a === 'copy') {
-          const lab = act.querySelector('[data-copy-label]'), old = lab.textContent;
-          lab.textContent = (await copyText(statsText())) ? '✅ تم النسخ' : '❌ فشل النسخ';
-          setTimeout(() => { lab.textContent = old; }, 1500);
-        }
-        return;
+  sec.addEventListener('click', async e => {
+    const t = e.target;
+    if (!t.closest) return;
+    const eye = t.closest('[data-eye]');
+    if (eye) { toggleEye(eye.getAttribute('data-eye')); return; }
+    const act = t.closest('[data-act]');
+    if (act) {
+      const a = act.getAttribute('data-act');
+      if (a === 'scan') scanAll(act);
+      else if (a === 'fold') { settings.folded = !settings.folded; saveSettings(); render(); }
+      else if (a === 'showall') {
+        settings.hiddenSubs = []; settings.hiddenTypes = []; settings.hideDone = false;
+        saveSettings(); applyHide(); syncPanels(); render();
+      } else if (a === 'copy') {
+        const lab = act.querySelector('[data-copy-label]'), old = lab.textContent;
+        lab.textContent = (await copyText(statsText())) ? '✅ تم النسخ' : '❌ فشل النسخ';
+        setTimeout(() => { lab.textContent = old; }, 1500);
       }
-      const ex = t.closest('[data-exp]');
-      if (ex) { const k = ex.getAttribute('data-exp'); statsOpen = statsOpen === k ? null : k; render(); }
-    });
+      return;
+    }
+    const ex = t.closest('[data-exp]');
+    if (ex) { const k = ex.getAttribute('data-exp'); statsOpen = statsOpen === k ? null : k; render(); }
+  });
 
-    target.parentElement.insertBefore(sec, target);
-  }
+  target.parentElement.insertBefore(sec, target);
+}
 
   function refresh() { collectList(); ensureCard(); applyHide(); render(); }
 
@@ -680,33 +716,39 @@
   }
 
   function tick() {
-    if (busy) return;
-    const prev = viewMode, p = unitPage();
-    if (p) {
-      viewMode = 'unit';
-      sortLessons(p.title, p.btns);
-      applyLessonVis(p.title, p.btns);
-      const box = p.btns[0].parentElement;
-      const sig = p.title + '|' + p.btns.map(b => norm(b.querySelector('h4').textContent) + (isDone(b) ? 1 : 0)).sort().join('~');
-      if (box !== lastBox || sig !== lastSig) {
-        lastBox = box; lastSig = sig;
-        storeUnit(p);
-        write(LAST_KEY, p.title);
-        if (openSet === null) openSet = new Set([p.title]); else openSet.add(p.title);
-      }
-      if (prev !== 'unit' && settings.inline) setTimeout(bounce, 120);
-      updateFab();
-      return;
-    }
-    const units = getUnits();
-    if (units.length) {
-      viewMode = 'list';
-      const host = units[0].parentElement.parentElement;
-      if (host !== mountedHost) mountList(host);
-      else if (!document.getElementById('nahj-stats')) refresh();
-    } else viewMode = 'other';
-    updateFab();
+  if (busy) return;
+  if (!isTargetCourse()) {                        // مش الكورس بتاعنا: ما نلمسش أي حاجة
+    if (active) { cleanup(); active = false; }
+    viewMode = 'other';
+    return;
   }
+  active = true;
+  const prev = viewMode, p = unitPage();
+  if (p) {
+    viewMode = 'unit';
+    sortLessons(p.title, p.btns);
+    applyLessonVis(p.title, p.btns);
+    const box = p.btns[0].parentElement;
+    const sig = p.title + '|' + p.btns.map(b => norm(b.querySelector('h4').textContent) + (isDone(b) ? 1 : 0)).sort().join('~');
+    if (box !== lastBox || sig !== lastSig) {
+      lastBox = box; lastSig = sig;
+      storeUnit(p);
+      write(LAST_KEY, p.title);
+      if (openSet === null) openSet = new Set([p.title]); else openSet.add(p.title);
+    }
+    if (prev !== 'unit' && settings.inline) setTimeout(bounce, 120);
+    updateFab();
+    return;
+  }
+  const units = getUnits();
+  if (units.length) {
+    viewMode = 'list';
+    const host = units[0].parentElement.parentElement;
+    if (host !== mountedHost) mountList(host);
+    else if (!document.getElementById('nahj-stats')) refresh();
+  } else viewMode = 'other';
+  updateFab();
+}
 
   function onSettingsChanged() {
     if (viewMode === 'list') { applyHide(); syncPanels(); render(); }

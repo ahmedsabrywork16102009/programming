@@ -1,5 +1,5 @@
 const KEY = 'nahj_settings';
-const DEF = { inline: true, hide: false, exclude: false, sort: true, dropHidden: true };
+const DEF = { inline: true, hide: false, exclude: false, sort: true, dropHidden: true, showEmpty: false };
 const inputs = Array.from(document.querySelectorAll('input[data-k]'));
 
 function paint(s) {

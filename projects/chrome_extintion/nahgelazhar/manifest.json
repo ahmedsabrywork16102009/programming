@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Nahgelazhar helper",
   "short_name": "Nahgelazhar",
-  "version": "2.0",
+  "version": "2.1",
   "description": "Progress stats and inline lessons for the Nahgelazhar platform.",
   "permissions": ["storage"],
   "host_permissions": ["https://nahgelazhar.com/*"],
