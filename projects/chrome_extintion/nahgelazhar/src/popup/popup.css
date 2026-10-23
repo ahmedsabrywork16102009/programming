@@ -13,3 +13,6 @@ input:checked { background: #14532d; }
 input:checked::after { transform: translateX(-16px); }
 input:disabled { opacity: .55; cursor: not-allowed; }
 footer { padding: 8px 16px 12px; font-size: 12px; color: #5b6b5f; }
+.reset { padding: 4px 16px 0; }
+.reset button { width: 100%; padding: 8px; border: 1px solid #c9cfc6; border-radius: 10px; background: transparent; color: #14391f; font-family: inherit; font-size: 13px; cursor: pointer; }
+.reset button.sure { background: #b3261e; border-color: #b3261e; color: #fff; }

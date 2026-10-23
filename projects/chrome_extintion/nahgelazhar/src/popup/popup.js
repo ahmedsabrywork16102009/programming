@@ -23,3 +23,23 @@ inputs.forEach(i => i.addEventListener('change', () => {
 chrome.storage.onChanged.addListener((c, area) => {
   if (area === 'local' && c[KEY]) paint(Object.assign({}, DEF, c[KEY].newValue || {}));
 });
+const resetBtn = document.getElementById('resetManual');
+let sure = false;
+resetBtn.addEventListener('click', () => {
+  if (!sure) {
+    sure = true;
+    resetBtn.classList.add('sure');
+    resetBtn.textContent = 'اضغط تاني للتأكيد';
+    setTimeout(() => { sure = false; resetBtn.classList.remove('sure'); resetBtn.textContent = 'مسح تصنيفاتي اليدوية'; }, 3000);
+    return;
+  }
+  chrome.storage.local.get(KEY, r => {
+    const cur = r[KEY] || {};
+    cur.manualSubs = { u: {}, l: {} };
+    chrome.storage.local.set({ [KEY]: cur });
+  });
+  sure = false;
+  resetBtn.classList.remove('sure');
+  resetBtn.textContent = '✅ تم المسح';
+  setTimeout(() => { resetBtn.textContent = 'مسح تصنيفاتي اليدوية'; }, 1500);
+});

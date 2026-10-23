@@ -17,14 +17,20 @@
   const settings = {
     hide: false, exclude: false, sort: true, inline: true, dropHidden: true,
     showEmpty: false, folded: false,
-    hiddenSubs: [], hideDone: false, hiddenTypes: []
+    hiddenSubs: [], hideDone: false, hiddenTypes: [],
+    manualSubs: { u: {}, l: {} }
   };
   function saveSettings() {
     try { chrome.storage.local.set({ [SETTINGS_KEY]: settings }); } catch (_) { write(SETTINGS_KEY, settings); }
   }
   function loadSettings(cb) {
     const old = read(SETTINGS_KEY, {});
-    const fin = stored => { Object.assign(settings, old, stored || {}); saveSettings(); cb(); };
+    const fin = stored => {
+      Object.assign(settings, old, stored || {});
+      const m = settings.manualSubs || {};
+      settings.manualSubs = { u: m.u || {}, l: m.l || {} };
+      saveSettings(); cb();
+    };
     try { chrome.storage.local.get(SETTINGS_KEY, r => fin(r && r[SETTINGS_KEY])); } catch (_) { fin(null); }
   }
 
@@ -35,6 +41,7 @@
   let busy = false, cancelScan = false, userMoved = false, skipRestoreOnce = false;
   let openSet = null;                     // null = آخر وحدة تلقائياً | Set بأسماء الوحدات المفتوحة
   let statsOpen = new Set();              // الصفوف والمواد المفتوحة في الإحصائيات
+  let editing = null;                     // العنصر اللي بتعدّل تصنيفه دلوقتي
   let active = false;                     // الإضافة شغالة على الكورس الحالي؟
   let fab = null, fabSide = read(FAB_KEY, 'right'), timer = null, raf = 0;
 
@@ -55,10 +62,12 @@
   const isLit = t => nrm(t).includes('ادبي');
   const findSubs = txt => { const n = nrm(txt); return SUBJECTS.filter(x => x[2].some(k => n.includes(k))).map(x => x[0]); };
   const subMemo = new Map();
-  function subjectsOf(t) {                         // مواد الوحدة: من اسمها، وإلا من أسماء دروسها
+  function subjectsOf(t) {                         // مواد الوحدة: يدوي، وإلا من اسمها، وإلا من أسماء دروسها
     if (subMemo.has(t)) return subMemo.get(t);
     let r = [];
-    if (!isLit(t)) {
+    const man = settings.manualSubs.u[t];
+    if (man) r = man.slice();
+    else if (!isLit(t)) {
       r = UNIT_OVERRIDES[t] ? UNIT_OVERRIDES[t].slice() : findSubs(t);
       if (!r.length) {
         const e = cache[t], cnt = {};
@@ -66,16 +75,19 @@
         const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
         if (top) r = [top[0]];
       }
-      r = r.filter(id => SUBJ_IDS.has(id));
     }
+    r = r.filter(id => SUBJ_IDS.has(id));
     subMemo.set(t, r);
     return r;
   }
-  function lessonSubs(t, l) {                      // مادة الدرس: من اسمه، وإلا من وحدته
+  function lessonSubs(t, l) {                      // مادة الدرس: يدوي، وإلا من اسمه، وإلا من وحدته
+    const man = settings.manualSubs.l[t + '||' + (l.n || '')];
+    if (man) return man.filter(id => SUBJ_IDS.has(id));
     if (isLit(t)) return [];
     const own = findSubs(l.n || '');
     return own.length ? own : subjectsOf(t);
   }
+
   function lessonSubHidden(t, l) {
     const s = lessonSubs(t, l);
     return s.length > 0 && s.every(x => settings.hiddenSubs.includes(x));
@@ -235,27 +247,7 @@
     return false;
   }
 
-  function computeStats() {
-    const s = { subs: {}, scanned: 0, nUnits: 0, all: { d: 0, t: 0 } };
-    ['units', 'video', 'explain', 'board', 'hw', 'pre', 'post', 'comp', 'other'].forEach(k => s[k] = { d: 0, t: 0 });
-    SUBJECTS.forEach(x => s.subs[x[0]] = { d: 0, t: 0 });
-    getUnits().forEach(u => {
-      const t = unitTitle(u);
-      if (isLit(t) && (settings.hide || settings.exclude)) return;
-      const e = cache[t];
-      if (!e) return;
-      const full = !!(e.total && e.done === e.total);
-      if (e.total) subjectsOf(t).forEach(sb => { s.subs[sb].t++; if (full) s.subs[sb].d++; });
-      if (settings.dropHidden && unitDropped(t)) return;
-      if (e.total) { s.units.t++; s.nUnits++; if (full) s.units.d++; if (!needScan(t)) s.scanned++; }
-      (e.lessons || []).forEach(l => {
-        if (settings.dropHidden && lessonSubHidden(t, l)) return;
-        l.tags.forEach(tg => { s[tg].t++; if (l.done) s[tg].d++; });
-        if (l.tags.length && !(settings.dropHidden && tagsHidden(l))) { s.all.t++; if (l.done) s.all.d++; }
-      });
-    });
-    return s;
-  }
+  const subLabel = ids => ids.map(id => (SUBJECTS.find(x => x[0] === id) || [])[1]).filter(Boolean).join(' + ') || 'عام';
 
   // أسماء اللي جوا كل صف في الإحصائيات
   function listFor(key) {
@@ -266,13 +258,19 @@
       const e = cache[t];
       if (!e) return;
       const full = !!(e.total && e.done === e.total);
-      if (key === 'u') { if (e.total && !(settings.dropHidden && unitDropped(t))) items.push({ n: t, done: full, x: e.done + '/' + e.total }); return; }
-      if (key.startsWith('s:')) { if (e.total && subjectsOf(t).includes(key.slice(2))) items.push({ n: t, done: full, x: e.done + '/' + e.total }); return; }
+      const unitItem = () => ({ n: t, done: full, x: e.done + '/' + e.total, ek: 'u:' + t, sub: subjectsOf(t), man: !!settings.manualSubs.u[t] });
+      if (key === 'u') { if (e.total && !(settings.dropHidden && unitDropped(t))) items.push(unitItem()); return; }
+      if (key.startsWith('s:')) { if (e.total && subjectsOf(t).includes(key.slice(2))) items.push(unitItem()); return; }
       if (settings.dropHidden && unitDropped(t)) return;
       const k = key.slice(2);
       (e.lessons || []).forEach(l => {
         if (settings.dropHidden && lessonSubHidden(t, l)) return;
-        if (l.tags.includes(k)) items.push({ n: l.n || 'درس (حدّث الدروس لعرض الاسم)', u: t, done: l.done });
+        if (!l.tags.includes(k)) return;
+        const lk = t + '||' + l.n;
+        items.push({
+          n: l.n || 'درس (حدّث الدروس لعرض الاسم)', u: t, done: l.done,
+          ek: l.n ? 'l:' + lk : '', sub: lessonSubs(t, l), man: !!(l.n && settings.manualSubs.l[lk])
+        });
       });
     });
     return items;
@@ -497,14 +495,25 @@
   const eyeBtn = (id, on) => `<button type="button" data-eye="${id}" title="${on ? 'إخفاء' : 'إظهار'}" class="text-green-700" style="background:none;border:0;cursor:pointer;padding:4px;display:flex;border-radius:8px">${ic(on ? 'eye' : 'off', 16)}</button>`;
   const actBtn = (act, icon, label) => `<button type="button" data-act="${act}" class="border border-green-200/70 text-green-800" style="display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:transparent">${ic(icon, 14)}${label}</button>`;
 
+  function subEditor(i) {
+    const cur = i.sub;
+    const chip = (id, label, on) => `<button type="button" data-sub="${id}" data-ekey="${esc(i.ek)}" class="${on ? 'bg-green-700 text-white' : 'border border-green-200/70 text-green-800'}" style="font-size:12px;padding:2px 10px;border-radius:999px;cursor:pointer;${on ? 'border:0;' : 'background:transparent;'}">${label}</button>`;
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px">` +
+      SUBJECTS.map(([id, l]) => chip(id, l, cur.includes(id))).join('') +
+      chip('none', 'عام', i.man && !cur.length) +
+      chip('auto', 'تلقائي', !i.man) + '</div>';
+  }
   function namesBox(key, title) {
     const items = listFor(key);
     const head = title ? `<div class="text-green-800" style="font-size:13px;font-weight:700;margin-bottom:4px">${esc(title)}</div>` : '';
     if (!items.length) return `<div class="bg-green-50 text-gray-500" style="border-radius:10px;padding:10px 12px;margin:2px 0 8px;font-size:13px">${head}لسه ما اتقرتش. اضغط «تحديث الدروس».</div>`;
     const done = items.filter(i => i.done).length;
-    return `<div class="bg-green-50" style="border-radius:10px;padding:8px 12px;margin:2px 0 8px">${head}<div class="text-gray-500" style="font-size:12px;margin-bottom:6px">${done} من ${items.length} مكتمل</div><div style="max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:6px">` +
-      items.map(i => `<div style="display:flex;gap:8px;align-items:flex-start;font-size:13px"><span class="${i.done ? 'text-green-700' : 'text-gray-400'}" style="margin-top:2px">${ic(i.done ? 'check' : 'circle', 14)}</span><span class="text-green-900" style="flex:1;min-width:0;word-break:break-word">${esc(i.n)}${i.u ? ` <span class="text-gray-500" style="font-size:12px">· ${esc(i.u)}</span>` : ''}${i.x ? ` <span class="text-gray-500" style="font-size:12px">${i.x}</span>` : ''}</span></div>`).join('') +
-      '</div></div>';
+    const row = i => {
+      const pill = i.ek ? `<button type="button" data-edit="${esc(i.ek)}" title="تعديل التصنيف" class="border border-green-200/70 text-green-700" style="flex-shrink:0;font-size:11px;padding:1px 8px;border-radius:999px;cursor:pointer;background:transparent;${i.man ? 'font-weight:700;' : ''}">${esc(subLabel(i.sub))}${i.man ? ' ✎' : ''}</button>` : '';
+      const editor = i.ek && editing === i.ek ? subEditor(i) : '';
+      return `<div><div style="display:flex;gap:8px;align-items:flex-start;font-size:13px"><span class="${i.done ? 'text-green-700' : 'text-gray-400'}" style="margin-top:2px">${ic(i.done ? 'check' : 'circle', 14)}</span><span class="text-green-900" style="flex:1;min-width:0;word-break:break-word">${esc(i.n)}${i.u ? ` <span class="text-gray-500" style="font-size:12px">· ${esc(i.u)}</span>` : ''}${i.x ? ` <span class="text-gray-500" style="font-size:12px">${i.x}</span>` : ''}</span>${pill}</div>${editor}</div>`;
+    };
+    return `<div class="bg-green-50" style="border-radius:10px;padding:8px 12px;margin:2px 0 8px">${head}<div class="text-gray-500" style="font-size:12px;margin-bottom:6px">${done} من ${items.length} مكتمل</div><div style="max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:6px">${items.map(row).join('')}</div></div>`;
   }
 
   function render() {
@@ -625,7 +634,8 @@
         (ls.length ? ls : ['none']).forEach(g => put(g, u, l));
       });
     });
-    const gname = { lit: '🎓 القسم الأدبي', none: '❔ وحدات مش متصنّفة' };
+    const gname = { lit: '🎓 القسم الأدبي', none: '📌 عام (مش تابع لمادة معينة)' };
+
     SUBJECTS.forEach(x => { gname[x[0]] = '🔹 ' + x[1]; });
     L.push('', BAR, '🗂️ التفاصيل حسب المادة', BAR);
     [...SUBJECTS.map(x => x[0]), 'lit', 'none'].forEach(g => {
@@ -688,6 +698,20 @@
     saveSettings();
     applyHide(); syncPanels(); render();
   }
+  function setManual(ek, id) {                     // حفظ التصنيف اليدوي
+    const store = ek[0] === 'u' ? settings.manualSubs.u : settings.manualSubs.l, key = ek.slice(2);
+    if (id === 'auto') delete store[key];
+    else if (id === 'none') store[key] = [];
+    else {
+      const cur = store[key] ? store[key].slice() : [];
+      const i = cur.indexOf(id);
+      if (i >= 0) cur.splice(i, 1); else cur.push(id);
+      store[key] = cur;
+    }
+    subMemo.clear();
+    saveSettings();
+    applyHide(); syncPanels(); render();
+  }
 
   function ensureCard() {
     if (document.getElementById('nahj-stats')) return;
@@ -721,6 +745,10 @@
         }
         return;
       }
+      const ed = t.closest('[data-edit]');
+      if (ed) { const k = ed.getAttribute('data-edit'); editing = editing === k ? null : k; render(); return; }
+      const sb = t.closest('[data-sub]');
+      if (sb) { setManual(sb.getAttribute('data-ekey'), sb.getAttribute('data-sub')); return; }
       const ex = t.closest('[data-exp]');
       if (ex) {                                      // ضغطة عادية: واحد بس، Ctrl: يضيف على المفتوح
         const k = ex.getAttribute('data-exp'), add = e.ctrlKey || e.metaKey;
@@ -878,7 +906,8 @@
     updateFab();
   }
 
-  function onSettingsChanged() {
+    function onSettingsChanged() {
+    subMemo.clear();
     if (viewMode === 'list') { applyHide(); syncPanels(); render(); }
     else if (viewMode === 'unit') tick();
   }

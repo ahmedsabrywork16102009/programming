@@ -18,4 +18,8 @@ git push -f origin main
 git add .
 git --no-pager diff HEAD > diff_output.txt
 
+
 Analyze this git diff and output only a commit command in Conventional Commits followed by git push, in two lines always inside a code block, no explanation.
+
+
+Apply the edits in this message to the code in this message exactly as specified—nothing more, nothing less, no changes to anything else—distinguish edits from code by context, then send me the full updated code in a single code block ready to copy.
