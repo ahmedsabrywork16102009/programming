@@ -34,24 +34,54 @@
   let mountedHost = null, lastBox = null, lastSig = '';
   let busy = false, cancelScan = false, userMoved = false, skipRestoreOnce = false;
   let openSet = null;                     // null = آخر وحدة تلقائياً | Set بأسماء الوحدات المفتوحة
-  let statsOpen = null;                   // الصف المفتوح في الإحصائيات
+  let statsOpen = new Set();              // الصفوف والمواد المفتوحة في الإحصائيات
   let active = false;                     // الإضافة شغالة على الكورس الحالي؟
   let fab = null, fabSide = read(FAB_KEY, 'right'), timer = null, raf = 0;
 
   // ===== المواد =====
+  // [المعرّف، الاسم، كلمات التعرّف عليها (بعد توحيد الهمزات والتاء المربوطة)]
   const SUBJECTS = [
-    ['adab', 'أدب', 'ادب'], ['nahw', 'نحو', 'نحو'], ['mutalaa', 'مطالعة', 'مطالعه'],
-    ['nosos', 'نصوص', 'نصوص'], ['sarf', 'صرف', 'صرف'], ['balagha', 'بلاغة', 'بلاغه']
+    ['adab', 'أدب', ['ادب', 'اتساع نطاق التعليم']],
+    ['nahw', 'نحو', ['نحو', 'اعراب', 'نداء', 'اساليب', 'نواصب', 'جوازم', 'استغاثه', 'ندبه', 'ترخيم']],
+    ['nosos', 'نصوص', ['نصوص']],
+    ['sarf', 'صرف', ['صرف', 'اشتقاق']],
+    ['balagha', 'بلاغة', ['بلاغه']]
   ];
+  const SUBJ_IDS = new Set(SUBJECTS.map(x => x[0]));
+  // لو وحدة مش بتتصنف لوحدها، اكتب اسمها بالظبط هنا ومادتها، مثال:
+  // 'الامتحان الشامل على ما تم شرحه': ['nahw'],
+  const UNIT_OVERRIDES = {
+  };
   const isLit = t => nrm(t).includes('ادبي');
-  const findSubs = txt => { const n = nrm(txt); return SUBJECTS.filter(x => n.includes(x[2])).map(x => x[0]); };
-  function subjectsOf(t) {
-    if (isLit(t)) return [];
-    const a = findSubs(t);
-    if (a.length) return a;
-    const e = cache[t];
-    return e ? (e.subs || (e.sub ? [e.sub] : [])) : [];
+  const findSubs = txt => { const n = nrm(txt); return SUBJECTS.filter(x => x[2].some(k => n.includes(k))).map(x => x[0]); };
+  const subMemo = new Map();
+  function subjectsOf(t) {                         // مواد الوحدة: من اسمها، وإلا من أسماء دروسها
+    if (subMemo.has(t)) return subMemo.get(t);
+    let r = [];
+    if (!isLit(t)) {
+      r = UNIT_OVERRIDES[t] ? UNIT_OVERRIDES[t].slice() : findSubs(t);
+      if (!r.length) {
+        const e = cache[t], cnt = {};
+        ((e && e.lessons) || []).forEach(l => findSubs(l.n).forEach(s => cnt[s] = (cnt[s] || 0) + 1));
+        const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+        if (top) r = [top[0]];
+      }
+      r = r.filter(id => SUBJ_IDS.has(id));
+    }
+    subMemo.set(t, r);
+    return r;
   }
+  function lessonSubs(t, l) {                      // مادة الدرس: من اسمه، وإلا من وحدته
+    if (isLit(t)) return [];
+    const own = findSubs(l.n || '');
+    return own.length ? own : subjectsOf(t);
+  }
+  function lessonSubHidden(t, l) {
+    const s = lessonSubs(t, l);
+    return s.length > 0 && s.every(x => settings.hiddenSubs.includes(x));
+  }
+  const tagsHidden = l => l.tags.some(x => settings.hiddenTypes.includes(x));
+  const lessonGone = (t, l) => tagsHidden(l) || lessonSubHidden(t, l);
 
   // ===== DOM =====
   const mainEl = () => document.querySelector('main') || document;
@@ -72,6 +102,7 @@
     return { title: norm(h1.textContent), btns };
   }
   function syncMode() { viewMode = unitPage() ? 'unit' : (getUnits().length ? 'list' : 'other'); }
+
   // ===== تحديد الكورس المستهدف =====
   const COURSE_ID = '4c086b90-30b2-44cc-a5f9-d2f74a4c3448';
   const COURSE_KEYS = ['مواد عربية', 'الثالث الثانوي'];
@@ -82,7 +113,7 @@
     const t = nrm(sec.textContent);
     return COURSE_KEYS.every(k => t.includes(nrm(k)));
   }
-  function cleanup() {                              // لما نخرج من الكورس: شيل كل أثرنا
+  function cleanup() {
     const c = document.getElementById('nahj-stats');
     if (c) c.remove();
     closePanels();
@@ -128,9 +159,8 @@
     const a = norm(b.querySelector('img')?.alt);
     return a || ['فيديو', 'ملف', 'اختبار'].find(t => b.textContent.includes(t)) || '';
   }
-  const tagsHidden = l => l.tags.some(x => settings.hiddenTypes.includes(x));
 
-  // ===== صفحة الوحدة الأصلية: ترتيب + إخفاء حسب النوع =====
+  // ===== صفحة الوحدة الأصلية: ترتيب + إخفاء =====
   function sortLessons(title, btns) {
     if (btns.length < 2) return;
     const box = btns[0].parentElement, list = btns.filter(b => b.parentElement === box);
@@ -146,8 +176,11 @@
   }
   function applyLessonVis(title, btns) {
     btns.forEach(b => {
-      const tags = classify(title, norm(b.querySelector('h4').textContent), lessonType(b));
-      b.style.display = tags.some(t => settings.hiddenTypes.includes(t)) ? 'none' : '';
+      const n = norm(b.querySelector('h4').textContent);
+      const byType = classify(title, n, lessonType(b)).some(t => settings.hiddenTypes.includes(t));
+      const subs = lessonSubs(title, { n });
+      const bySub = subs.length > 0 && subs.every(x => settings.hiddenSubs.includes(x));
+      b.style.display = (byType || bySub) ? 'none' : '';
     });
   }
 
@@ -163,13 +196,7 @@
     });
     e.total = e.lessons.length;
     e.done = e.lessons.filter(l => l.done).length;
-    if (!isLit(t) && !findSubs(t).length) {
-      const cnt = {};
-      e.lessons.forEach(l => findSubs(l.n).forEach(s => cnt[s] = (cnt[s] || 0) + 1));
-      const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
-      e.subs = top ? [top[0]] : [];
-      delete e.sub;
-    }
+    subMemo.clear();
     cache[t] = e;
     write(CACHE_KEY, cache);
     if (iconsDirty) write(ICON_KEY, icons);
@@ -193,11 +220,11 @@
   const needData = t => !hasTitles(t) || needScan(t);
   function isComplete(t) { const e = cache[t]; return !!(e && e.total && e.done === e.total); }
 
-  // الوحدة تختفي لو كل موادها مخفية، أو كل دروسها مخفية بالنوع
+  // الوحدة تختفي لو كل موادها مخفية، أو كل دروسها مخفية (بالنوع أو بالمادة)
   function subjectHidden(t) { const s = subjectsOf(t); return s.length > 0 && s.every(x => settings.hiddenSubs.includes(x)); }
   function allLessonsHidden(t) {
     const e = cache[t];
-    return !!(settings.hiddenTypes.length && e && e.lessons && e.lessons.length && e.lessons.every(tagsHidden));
+    return !!((settings.hiddenTypes.length || settings.hiddenSubs.length) && e && e.lessons && e.lessons.length && e.lessons.every(l => lessonGone(t, l)));
   }
   const unitDropped = t => subjectHidden(t) || allLessonsHidden(t);
   function unitHidden(u) {
@@ -222,6 +249,7 @@
       if (settings.dropHidden && unitDropped(t)) return;
       if (e.total) { s.units.t++; s.nUnits++; if (full) s.units.d++; if (!needScan(t)) s.scanned++; }
       (e.lessons || []).forEach(l => {
+        if (settings.dropHidden && lessonSubHidden(t, l)) return;
         l.tags.forEach(tg => { s[tg].t++; if (l.done) s[tg].d++; });
         if (l.tags.length && !(settings.dropHidden && tagsHidden(l))) { s.all.t++; if (l.done) s.all.d++; }
       });
@@ -242,7 +270,10 @@
       if (key.startsWith('s:')) { if (e.total && subjectsOf(t).includes(key.slice(2))) items.push({ n: t, done: full, x: e.done + '/' + e.total }); return; }
       if (settings.dropHidden && unitDropped(t)) return;
       const k = key.slice(2);
-      (e.lessons || []).forEach(l => { if (l.tags.includes(k)) items.push({ n: l.n || 'درس (حدّث الدروس لعرض الاسم)', u: t, done: l.done }); });
+      (e.lessons || []).forEach(l => {
+        if (settings.dropHidden && lessonSubHidden(t, l)) return;
+        if (l.tags.includes(k)) items.push({ n: l.n || 'درس (حدّث الدروس لعرض الاسم)', u: t, done: l.done });
+      });
     });
     return items;
   }
@@ -278,13 +309,13 @@
     document.querySelectorAll('[data-nahj-panel]').forEach(p => p.remove());
     getUnits().forEach(u => setChev(u, false));
   }
-  function showPanel(u) {                              // بيعرض وحدة واحدة من غير ما يقفل غيرها
+  function showPanel(u) {
     const t = unitTitle(u), e = cache[t], card = unitCard(u);
     removePanel(card);
     if (!e || !hasTitles(t)) { setChev(u, false); return; }
     const rows = e.lessons.slice()
       .sort((a, b) => (settings.sort ? rank(t, a.n, a.ty) - rank(t, b.n, b.ty) : 0) || a.i - b.i)
-      .filter(l => !tagsHidden(l));
+      .filter(l => !lessonGone(t, l));
     if (!rows.length) { setChev(u, false); return; }
     const panel = mk('div', 'border-t border-green-100');
     panel.setAttribute('data-nahj', ''); panel.setAttribute('data-nahj-panel', ''); panel.dataset.unit = t;
@@ -306,7 +337,7 @@
     if (openSet === null) { const l = read(LAST_KEY, null); return l ? [l] : []; }
     return Array.from(openSet);
   }
-  function syncPanels() {                              // يطابق الشاشة مع الوحدات المفتوحة
+  function syncPanels() {
     if (!settings.inline) { closePanels(); return; }
     const want = new Set(openTitles());
     getUnits().forEach(u => {
@@ -329,7 +360,7 @@
     const isOpen = !!card.querySelector(':scope > [data-nahj-panel]');
     if (isOpen) {
       if (additive || set.size <= 1) { set.delete(t); removePanel(card); setChev(btn, false); }
-      else { set.clear(); set.add(t); syncPanels(); }       // ضغطة عادية: افتحها هي بس
+      else { set.clear(); set.add(t); syncPanels(); }
       return;
     }
     if (!additive) set.clear();
@@ -466,11 +497,12 @@
   const eyeBtn = (id, on) => `<button type="button" data-eye="${id}" title="${on ? 'إخفاء' : 'إظهار'}" class="text-green-700" style="background:none;border:0;cursor:pointer;padding:4px;display:flex;border-radius:8px">${ic(on ? 'eye' : 'off', 16)}</button>`;
   const actBtn = (act, icon, label) => `<button type="button" data-act="${act}" class="border border-green-200/70 text-green-800" style="display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:transparent">${ic(icon, 14)}${label}</button>`;
 
-  function namesBox(key) {
+  function namesBox(key, title) {
     const items = listFor(key);
-    if (!items.length) return '<div class="bg-green-50 text-gray-500" style="border-radius:10px;padding:10px 12px;margin:2px 0 8px;font-size:13px">لسه ما اتقرتش. اضغط «تحديث الدروس».</div>';
+    const head = title ? `<div class="text-green-800" style="font-size:13px;font-weight:700;margin-bottom:4px">${esc(title)}</div>` : '';
+    if (!items.length) return `<div class="bg-green-50 text-gray-500" style="border-radius:10px;padding:10px 12px;margin:2px 0 8px;font-size:13px">${head}لسه ما اتقرتش. اضغط «تحديث الدروس».</div>`;
     const done = items.filter(i => i.done).length;
-    return `<div class="bg-green-50" style="border-radius:10px;padding:8px 12px;margin:2px 0 8px"><div class="text-gray-500" style="font-size:12px;margin-bottom:6px">${done} من ${items.length} مكتمل</div><div style="max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:6px">` +
+    return `<div class="bg-green-50" style="border-radius:10px;padding:8px 12px;margin:2px 0 8px">${head}<div class="text-gray-500" style="font-size:12px;margin-bottom:6px">${done} من ${items.length} مكتمل</div><div style="max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:6px">` +
       items.map(i => `<div style="display:flex;gap:8px;align-items:flex-start;font-size:13px"><span class="${i.done ? 'text-green-700' : 'text-gray-400'}" style="margin-top:2px">${ic(i.done ? 'check' : 'circle', 14)}</span><span class="text-green-900" style="flex:1;min-width:0;word-break:break-word">${esc(i.n)}${i.u ? ` <span class="text-gray-500" style="font-size:12px">· ${esc(i.u)}</span>` : ''}${i.x ? ` <span class="text-gray-500" style="font-size:12px">${i.x}</span>` : ''}</span></div>`).join('') +
       '</div></div>';
   }
@@ -487,12 +519,14 @@
       .map((x, i) => ({ x, i }))
       .sort((a, b) => (subOn(b.x[0]) - subOn(a.x[0])) || (a.i - b.i))
       .map(({ x: [id, l] }) => {
-        const o = s.subs[id], on = subOn(id), open = statsOpen === 's:' + id;
+        const o = s.subs[id], on = subOn(id), open = statsOpen.has('s:' + id);
         return `<div data-exp="s:${id}" class="border border-green-200/70${open ? ' bg-green-50' : ''}" style="flex:1 0 108px;display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:12px;cursor:pointer;${on ? '' : 'opacity:.5;border-style:dashed;'}">` +
           vbar(pct(o)) +
           `<div style="flex:1;min-width:0"><div class="text-green-900" style="font-size:13px;font-weight:700">${l}</div><div class="text-gray-500" style="font-size:12px">${o.d}/${o.t}</div></div>` +
           eyeBtn('s:' + id, on) + '</div>';
       }).join('');
+    const subBoxes = SUBJECTS.filter(([id]) => statsOpen.has('s:' + id))
+      .map(([id, l]) => `<div style="margin-top:8px">${namesBox('s:' + id, l)}</div>`).join('');
 
     const typeOn = k => k === 'units' ? !settings.hideDone : !settings.hiddenTypes.includes(k);
     const rows = CARDS
@@ -502,7 +536,7 @@
       .map(({ c: [k, icon, l] }) => {
         const o = s[k], key = k === 'units' ? 'u' : 't:' + k;
         const on = typeOn(k);
-        const open = statsOpen === key;
+        const open = statsOpen.has(key);
         return `<div class="border-t border-green-100"><div data-exp="${key}" style="display:flex;align-items:center;gap:10px;padding:9px 2px;cursor:pointer;${on ? '' : 'opacity:.5;'}">` +
           `<span class="text-green-900" style="width:150px;font-size:13px;display:flex;gap:6px;align-items:center"><span>${icon}</span>${l}</span>` +
           hbar(pct(o)) +
@@ -526,12 +560,12 @@
 
     const details = folded ? '' :
       (chips ? `<div class="text-gray-500" style="font-size:12px;font-weight:700;margin:16px 0 8px">المواد</div><div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px">${chips}</div>` : '') +
-      (statsOpen && statsOpen.startsWith('s:') ? `<div style="margin-top:8px">${namesBox(statsOpen)}</div>` : '') +
+      subBoxes +
       `<div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 4px"><span class="text-gray-500" style="font-size:12px;font-weight:700">الأنواع</span>${partial ? `<span class="text-gold-700" style="font-size:12px">محسوبة من ${s.scanned} وحدة من ${s.nUnits} — اضغط «تحديث الدروس»</span>` : ''}</div>` +
       rows;
 
     card.innerHTML =
-      `<button type="button" data-act="copy" class="bg-white border border-green-200/70 text-green-800" style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;border-radius:999px;padding:5px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.08)">${ic('copy', 15)}<span data-copy-label>نسخ الإحصائيات</span></button>` +
+      `<button type="button" data-act="copy" title="ضغطة = ملخص · Ctrl + ضغطة = تقرير مفصّل" class="bg-white border border-green-200/70 text-green-800" style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;border-radius:999px;padding:5px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.08)">${ic('copy', 15)}<span data-copy-label>نسخ الإحصائيات</span></button>` +
       `<div style="padding:22px 18px ${folded ? 14 : 10}px">` + header + summary + details + '</div>';
   }
 
@@ -542,6 +576,82 @@
     lines.push('', '🗂️ المواد: ' + SUBJECTS.filter(x => s.subs[x[0]].t).map(x => `${x[1]} ${s.subs[x[0]].d}/${s.subs[x[0]].t}`).join(' | '));
     if (settings.hide || settings.exclude) lines.push('', '(من غير الأدبي)');
     return lines.join('\n');
+  }
+
+  // التقرير المفصّل: كل مادة ← وحدة ← درس، وبعدها كل نوع ← دروسه
+  function fullReport() {
+    const s = computeStats();
+    const BAR = '━━━━━━━━━━━━━━━━━━━━';
+    const ti = ty => ty === 'فيديو' ? '🎬' : ty === 'ملف' ? '📄' : '📝';
+    const mark = d => d ? '✅' : '⬜';
+    const units = [];
+    getUnits().forEach((u, idx) => {
+      const title = unitTitle(u);
+      if (isLit(title) && (settings.hide || settings.exclude)) return;
+      const e = cache[title];
+      if (!e || !e.total) return;
+      if (settings.dropHidden && unitDropped(title)) return;
+      units.push({ title, e, n: idx + 1 });
+    });
+
+    const L = [
+      '📊 تقرير تقدمي المفصّل — نهج الأزهر',
+      '📅 ' + new Date().toLocaleDateString('ar-EG'),
+      BAR,
+      `✅ إجمالي الدروس: ${s.all.d}/${s.all.t} (${pct(s.all)}%)`,
+      `📚 الوحدات المكتملة: ${s.units.d}/${s.units.t} (${pct(s.units)}%)`,
+      '', '📈 حسب النوع:'
+    ];
+    CARDS.forEach(([k, i, l]) => { if (k !== 'other' || s[k].t) L.push(`   ${i} ${l}: ${s[k].d}/${s[k].t} (${pct(s[k])}%)`); });
+    const subLines = SUBJECTS.filter(x => s.subs[x[0]].t).map(x => `   🔹 ${x[1]}: ${s.subs[x[0]].d}/${s.subs[x[0]].t} وحدة (${pct(s.subs[x[0]])}%)`);
+    if (subLines.length) L.push('', '🗂️ حسب المادة:', ...subLines);
+    if (settings.hide || settings.exclude) L.push('', '(من غير القسم الأدبي)');
+
+    // ---- التفاصيل حسب المادة ----
+    const groups = new Map();
+    const put = (g, u, l) => {
+      if (!groups.has(g)) groups.set(g, new Map());
+      const m = groups.get(g);
+      if (!m.has(u.title)) m.set(u.title, { n: u.n, e: u.e, ls: [] });
+      if (l) m.get(u.title).ls.push(l);
+    };
+    units.forEach(u => {
+      const lessons = u.e.lessons || [];
+      if (isLit(u.title)) { if (!lessons.length) put('lit', u, null); lessons.forEach(l => put('lit', u, l)); return; }
+      if (!lessons.length) { const us = subjectsOf(u.title); (us.length ? us : ['none']).forEach(g => put(g, u, null)); return; }
+      lessons.forEach(l => {
+        if (settings.dropHidden && lessonSubHidden(u.title, l)) return;
+        const ls = lessonSubs(u.title, l);
+        (ls.length ? ls : ['none']).forEach(g => put(g, u, l));
+      });
+    });
+    const gname = { lit: '🎓 القسم الأدبي', none: '❔ وحدات مش متصنّفة' };
+    SUBJECTS.forEach(x => { gname[x[0]] = '🔹 ' + x[1]; });
+    L.push('', BAR, '🗂️ التفاصيل حسب المادة', BAR);
+    [...SUBJECTS.map(x => x[0]), 'lit', 'none'].forEach(g => {
+      const m = groups.get(g);
+      if (!m || !m.size) return;
+      let gd = 0, gt = 0;
+      m.forEach(v => v.ls.forEach(l => { gt++; if (l.done) gd++; }));
+      L.push('', `${gname[g]} — ${gd}/${gt} درس (${pct({ d: gd, t: gt })}%)`);
+      m.forEach((v, title) => {
+        if (!v.ls.length) { L.push(`  ⬜ [${v.n}] ${title} — ${v.e.done}/${v.e.total} (الدروس لسه ما اتقرتش)`); return; }
+        const ud = v.ls.filter(l => l.done).length;
+        L.push(`  ${mark(ud === v.ls.length)} [${v.n}] ${title} — ${ud}/${v.ls.length}`);
+        v.ls.slice().sort((a, b) => a.i - b.i).forEach(l => L.push(`      ${mark(l.done)} ${ti(l.ty)} ${l.n || '—'}`));
+      });
+    });
+
+    // ---- التفاصيل حسب النوع ----
+    L.push('', BAR, '📈 التفاصيل حسب النوع', BAR);
+    CARDS.forEach(([k, i, l]) => {
+      const items = listFor(k === 'units' ? 'u' : 't:' + k);
+      if (!items.length) return;
+      L.push('', `${i} ${l} — ${s[k].d}/${s[k].t} (${pct(s[k])}%)`);
+      items.forEach(it => L.push(`  ${mark(it.done)} ${it.n}${it.u ? '  ←  ' + it.u : ''}${it.x ? '  (' + it.x + ')' : ''}`));
+    });
+    L.push('', BAR, '— Nahgelazhar helper');
+    return L.join('\n');
   }
 
   async function copyText(t) {
@@ -603,14 +713,26 @@
           settings.hiddenSubs = []; settings.hiddenTypes = []; settings.hideDone = false;
           saveSettings(); applyHide(); syncPanels(); render();
         } else if (a === 'copy') {
+          const full = e.ctrlKey || e.metaKey;
           const lab = act.querySelector('[data-copy-label]'), old = lab.textContent;
-          lab.textContent = (await copyText(statsText())) ? '✅ تم النسخ' : '❌ فشل النسخ';
-          setTimeout(() => { lab.textContent = old; }, 1500);
+          const ok = await copyText(full ? fullReport() : statsText());
+          lab.textContent = ok ? (full ? '✅ تم نسخ التقرير المفصّل' : '✅ تم النسخ') : '❌ فشل النسخ';
+          setTimeout(() => { lab.textContent = old; }, 1800);
         }
         return;
       }
       const ex = t.closest('[data-exp]');
-      if (ex) { const k = ex.getAttribute('data-exp'); statsOpen = statsOpen === k ? null : k; render(); }
+      if (ex) {                                      // ضغطة عادية: واحد بس، Ctrl: يضيف على المفتوح
+        const k = ex.getAttribute('data-exp'), add = e.ctrlKey || e.metaKey;
+        if (statsOpen.has(k)) {
+          if (add || statsOpen.size <= 1) statsOpen.delete(k);
+          else { statsOpen.clear(); statsOpen.add(k); }
+        } else {
+          if (!add) statsOpen.clear();
+          statsOpen.add(k);
+        }
+        render();
+      }
     });
 
     target.parentElement.insertBefore(sec, target);
