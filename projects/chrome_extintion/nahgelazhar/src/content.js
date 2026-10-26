@@ -2,7 +2,7 @@
   'use strict';
 
   const LAST_KEY = 'nahj_last_unit', SETTINGS_KEY = 'nahj_settings', CACHE_KEY = 'nahj_stats_cache',
-    FAB_KEY = 'nahj_fab_side', ICON_KEY = 'nahj_icons';
+        FAB_KEY = 'nahj_fab_side', ICON_KEY = 'nahj_icons';
   const log = (...a) => console.log('[Nahj Helper]', ...a);
   const norm = s => (s || '').replace(/\s+/g, ' ').trim();
   const nrm = s => norm(s).replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه');
@@ -87,7 +87,6 @@
     const own = findSubs(l.n || '');
     return own.length ? own : subjectsOf(t);
   }
-
   function lessonSubHidden(t, l) {
     const s = lessonSubs(t, l);
     return s.length > 0 && s.every(x => settings.hiddenSubs.includes(x));
@@ -245,6 +244,28 @@
     if (unitDropped(t)) return true;
     if (settings.hideDone && isComplete(t)) return true;
     return false;
+  }
+
+  function computeStats() {
+    const s = { subs: {}, scanned: 0, nUnits: 0, all: { d: 0, t: 0 } };
+    ['units', 'video', 'explain', 'board', 'hw', 'pre', 'post', 'comp', 'other'].forEach(k => s[k] = { d: 0, t: 0 });
+    SUBJECTS.forEach(x => s.subs[x[0]] = { d: 0, t: 0 });
+    getUnits().forEach(u => {
+      const t = unitTitle(u);
+      if (isLit(t) && (settings.hide || settings.exclude)) return;
+      const e = cache[t];
+      if (!e) return;
+      const full = !!(e.total && e.done === e.total);
+      if (e.total) subjectsOf(t).forEach(sb => { s.subs[sb].t++; if (full) s.subs[sb].d++; });
+      if (settings.dropHidden && unitDropped(t)) return;
+      if (e.total) { s.units.t++; s.nUnits++; if (full) s.units.d++; if (!needScan(t)) s.scanned++; }
+      (e.lessons || []).forEach(l => {
+        if (settings.dropHidden && lessonSubHidden(t, l)) return;
+        l.tags.forEach(tg => { s[tg].t++; if (l.done) s[tg].d++; });
+        if (l.tags.length && !(settings.dropHidden && tagsHidden(l))) { s.all.t++; if (l.done) s.all.d++; }
+      });
+    });
+    return s;
   }
 
   const subLabel = ids => ids.map(id => (SUBJECTS.find(x => x[0] === id) || [])[1]).filter(Boolean).join(' + ') || 'عام';
@@ -635,7 +656,6 @@
       });
     });
     const gname = { lit: '🎓 القسم الأدبي', none: '📌 عام (مش تابع لمادة معينة)' };
-
     SUBJECTS.forEach(x => { gname[x[0]] = '🔹 ' + x[1]; });
     L.push('', BAR, '🗂️ التفاصيل حسب المادة', BAR);
     [...SUBJECTS.map(x => x[0]), 'lit', 'none'].forEach(g => {
@@ -698,6 +718,7 @@
     saveSettings();
     applyHide(); syncPanels(); render();
   }
+
   function setManual(ek, id) {                     // حفظ التصنيف اليدوي
     const store = ek[0] === 'u' ? settings.manualSubs.u : settings.manualSubs.l, key = ek.slice(2);
     if (id === 'auto') delete store[key];
@@ -906,7 +927,7 @@
     updateFab();
   }
 
-    function onSettingsChanged() {
+  function onSettingsChanged() {
     subMemo.clear();
     if (viewMode === 'list') { applyHide(); syncPanels(); render(); }
     else if (viewMode === 'unit') tick();

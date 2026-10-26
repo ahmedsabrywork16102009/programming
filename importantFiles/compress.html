@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ضاغط الكود</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  h1 { margin-bottom: 15px; color: #89b4fa; font-size: 24px; }
+  .container {
+    width: 100%; max-width: 900px;
+    display: flex; flex-direction: column; gap: 15px;
+  }
+  textarea {
+    width: 100%; height: 200px; padding: 12px;
+    border-radius: 8px; border: 2px solid #45475a;
+    background: #181825; color: #cdd6f4;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 14px; resize: vertical;
+    direction: ltr; transition: 0.2s;
+  }
+  textarea:focus { outline: none; border-color: #89b4fa; }
+  #output { border-color: #a6e3a1; cursor: pointer; }
+  #output:hover { border-color: #94e2d5; background: #1e2a1e; }
+
+  .toggle-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #181825;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 2px solid #45475a;
+    cursor: pointer;
+    user-select: none;
+    transition: 0.2s;
+  }
+  .toggle-box:hover { border-color: #89b4fa; }
+  .toggle-box input[type="checkbox"] {
+    width: 20px; height: 20px;
+    cursor: pointer;
+    accent-color: #89b4fa;
+  }
+  .toggle-box label {
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: bold;
+  }
+  .toggle-box .desc {
+    font-size: 12px;
+    color: #6c7086;
+    margin-right: auto;
+  }
+
+  .buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+  button {
+    flex: 1; min-width: 140px; padding: 12px 20px;
+    border: none; border-radius: 8px;
+    font-size: 15px; font-weight: bold;
+    cursor: pointer; transition: 0.2s;
+    font-family: inherit;
+  }
+  #saveBtn { background: #f9e2af; color: #1e1e2e; }
+  #saveBtn:hover { background: #fab387; }
+  #clearBtn { background: #f38ba8; color: #1e1e2e; }
+  #clearBtn:hover { background: #eba0ac; }
+
+  .label { font-size: 14px; color: #a6adc8; margin-bottom: 5px; }
+  .hint { font-size: 12px; color: #6c7086; margin-top: 4px; }
+  #status {
+    text-align: center; font-size: 14px;
+    min-height: 20px; color: #a6e3a1;
+  }
+</style>
+</head>
+<body>
+
+<h1>🗜️ ضاغط الكود</h1>
+
+<div class="container">
+
+  <!-- ✅ Checkbox التحكم في الوضع -->
+  <div class="toggle-box" onclick="toggleMode(event)">
+    <input type="checkbox" id="pasteMode" checked>
+    <label for="pasteMode">📥 وضع اللصق التلقائي</label>
+    <span class="desc" id="modeDesc">(مفعّل — اضغط في المكان هيتلصق)</span>
+  </div>
+
+  <div>
+    <div class="label">📥 مكان الكود:</div>
+    <textarea id="input" placeholder="اضغط هنا..."></textarea>
+    <div class="hint" id="inputHint">💡 اضغط في المكان = يتلصق تلقائياً</div>
+  </div>
+
+  <div>
+    <div class="label">📤 الناتج (اضغط عليه هيتنسخ تلقائياً):</div>
+    <textarea id="output" readonly placeholder="هيظهر هنا تلقائياً..."></textarea>
+    <div class="hint">💡 اضغط على الناتج عشان يتنسخ</div>
+  </div>
+
+  <div class="buttons">
+    <button id="saveBtn">💾 احفظ .txt</button>
+    <button id="clearBtn">🗑️ امسح</button>
+  </div>
+
+  <div id="status"></div>
+
+</div>
+
+<script>
+  const input = document.getElementById('input');
+  const output = document.getElementById('output');
+  const status = document.getElementById('status');
+  const pasteMode = document.getElementById('pasteMode');
+  const modeDesc = document.getElementById('modeDesc');
+  const inputHint = document.getElementById('inputHint');
+
+  function showStatus(msg, color = '#a6e3a1') {
+    status.textContent = msg;
+    status.style.color = color;
+    setTimeout(() => status.textContent = '', 2500);
+  }
+
+  function compressCode(code) {
+    return code
+      .replace(/\r?\n/g, ' ')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\s*([{}();,:+\-*/=<>!&|\[\]])\s*/g, '$1')
+      .trim();
+  }
+
+  // تحديث النص حسب الوضع
+  function updateModeUI() {
+    if (pasteMode.checked) {
+      modeDesc.textContent = '(مفعّل — اضغط في المكان هيتلصق)';
+      inputHint.textContent = '💡 اضغط في المكان = يتلصق تلقائياً';
+    } else {
+      modeDesc.textContent = '(متوقف — اكتب بنفسك أو Ctrl+V)';
+      inputHint.textContent = '💡 وضع الكتابة — اكتب بنفسك أو استخدم Ctrl+V';
+    }
+  }
+  pasteMode.addEventListener('change', updateModeUI);
+  updateModeUI();
+
+  // منع الـ label من تفعيل/تعطيل الـ checkbox مرتين
+  function toggleMode(e) {
+    if (e.target.tagName !== 'INPUT') {
+      pasteMode.checked = !pasteMode.checked;
+      updateModeUI();
+    }
+  }
+
+  // ✅ اللصق التلقائي (لو الوضع مفعّل)
+  input.addEventListener('click', async () => {
+    if (!pasteMode.checked) return; // لو وضع الكتابة، مفيش لصق
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        input.value = text;
+        output.value = compressCode(text);
+        showStatus('📥 اتلصق واتضغط!');
+      }
+    } catch {
+      showStatus('⚠️ المتصفح رفض اللصق. استخدم Ctrl+V', '#f9e2af');
+    }
+  });
+
+  // ✅ لو لصق بـ Ctrl+V في أي وضع → يتضغط
+  input.addEventListener('paste', () => {
+    setTimeout(() => {
+      const code = input.value;
+      if (code.trim()) {
+        output.value = compressCode(code);
+        showStatus('✅ اتضغط!');
+      }
+    }, 10);
+  });
+
+  // ✅ كتابة حية (لو وضع الكتابة)
+  input.addEventListener('input', () => {
+    const code = input.value;
+    if (code.trim()) {
+      output.value = compressCode(code);
+    } else {
+      output.value = '';
+    }
+  });
+
+  // ✅ النسخ التلقائي: لما تضغط على الناتج
+  output.addEventListener('click', async () => {
+    if (!output.value) return;
+    try {
+      await navigator.clipboard.writeText(output.value);
+      showStatus('📋 اتنسخ!');
+    } catch {
+      output.select();
+      document.execCommand('copy');
+      showStatus('📋 اتنسخ!');
+    }
+  });
+
+  // حفظ كملف txt
+  document.getElementById('saveBtn').onclick = () => {
+    if (!output.value) {
+      showStatus('⚠️ مفيش ناتج!', '#f9e2af');
+      return;
+    }
+    const blob = new Blob([output.value], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'code.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+    showStatus('💾 اتحفظ!');
+  };
+
+  // مسح
+  document.getElementById('clearBtn').onclick = () => {
+    input.value = '';
+    output.value = '';
+    showStatus('🗑️ اتمسح');
+  };
+</script>
+
+</body>
+</html>

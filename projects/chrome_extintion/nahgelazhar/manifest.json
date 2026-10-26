@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Nahgelazhar helper",
   "short_name": "Nahgelazhar",
-  "version": "2.4",
-  "description": "Progress stats and inline lessons for the Nahgelazhar platform.",
+  "version": "3.0",
+  "description": "Subject and lecture view for the Nahgelazhar platform.",
   "permissions": ["storage"],
   "host_permissions": ["https://nahgelazhar.com/*"],
   "icons": {
@@ -19,8 +19,14 @@
   "content_scripts": [
     {
       "matches": ["https://nahgelazhar.com/*"],
+      "js": ["src/hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://nahgelazhar.com/*"],
       "js": ["src/content.js"],
-      "run_at": "document_end"
+      "run_at": "document_start"
     }
   ]
 }

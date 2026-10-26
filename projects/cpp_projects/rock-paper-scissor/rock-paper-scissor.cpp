@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace std;
@@ -38,6 +39,31 @@ struct stGameInfo {
 };
 
 // =================================================================================
+//  Constants & Drawings
+// =================================================================================
+
+constexpr string_view ROCK_DRAWING = R"(    _______
+---'   ____)
+      (_____)
+      (_____)
+      (____)
+---.__(___))";
+
+constexpr string_view PAPER_DRAWING = R"(    _______
+---'   ____)____
+          ______)
+          _______)
+         _______)
+---.__________)";
+
+constexpr string_view SCISSOR_DRAWING = R"(    _______
+---'   ____)____
+          ______)
+       __________)
+      (____)
+---.__(___))";
+
+// =================================================================================
 //  Game Logic
 // =================================================================================
 
@@ -66,6 +92,19 @@ string getChoiceName(enChoice choice) {
   return arr[choice - 1];
 }
 
+string_view getChoiceDrawing(enChoice choice) {
+  switch (choice) {
+  case enChoice::Rock:
+    return ROCK_DRAWING;
+  case enChoice::Paper:
+    return PAPER_DRAWING;
+  case enChoice::Scissor:
+    return SCISSOR_DRAWING;
+  default:
+    return "";
+  }
+}
+
 enWinner getFinalGameWinner(int playerWinTimes, int computerWinTimes) {
   if (playerWinTimes > computerWinTimes) return Player;
   else if (computerWinTimes > playerWinTimes) return Computer;
@@ -80,7 +119,9 @@ void printRoundResults(int roundNumber, enChoice playerChoice,
                        enChoice computerChoice, string winnerName) {
   cout << "----------------- Round [ " << roundNumber << " ] -----------------\n";
   cout << "Player choice: " << getChoiceName(playerChoice) << "\n";
-  cout << "Computer choice: " << getChoiceName(computerChoice) << "\n\n";
+  cout << getChoiceDrawing(playerChoice) << "\n\n";
+  cout << "Computer choice: " << getChoiceName(computerChoice) << "\n";
+  cout << getChoiceDrawing(computerChoice) << "\n\n";
   cout << "=============================================\n";
   cout << "======== Winner: " << setw(8) << winnerName << " ========\n";
   cout << "=============================================\n\n\n";

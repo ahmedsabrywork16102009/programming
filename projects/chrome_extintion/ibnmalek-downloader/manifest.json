@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "ابن مالك — جامع الدروس",
+  "version": "0.1.0",
+  "description": "يجمع بيانات الدروس ويحفظها محليًا، ويتحقق من التغييرات، ويعرض تقدم المهام.",
+  "permissions": ["storage", "downloads", "tabs", "scripting"],
+  "host_permissions": ["https://ibnmalekar.com/*", "https://www.ibnmalekar.com/*", "https://*.ibnmalekar.com/*", "https://*.tamayyuzcenter.com/*"],
+  "action": {"default_title": "جامع دروس ابن مالك", "default_popup": "popup.html"},
+  "background": {"service_worker": "background.js"},
+  "content_scripts": [
+    {"matches": ["https://ibnmalekar.com/*", "https://www.ibnmalekar.com/*", "https://*.tamayyuzcenter.com/*"], "js": ["content.js"], "run_at": "document_idle"}
+  ]
+}

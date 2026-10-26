@@ -1,40 +1,22 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
-
 <head>
   <meta charset="utf-8">
   <title>Nahgelazhar helper</title>
   <link rel="stylesheet" href="popup.css">
 </head>
-
 <body>
   <header>Nahgelazhar helper<small>الإعدادات بتتطبق فوراً على الموقع</small></header>
   <main>
-    <label>
-      <div class="t"><b>عرض الدروس جوا الصفحة</b><span>الشكل القديم: الدروس تحت الوحدة بدل صفحة جديدة</span></div><input
-        type="checkbox" data-k="inline">
-    </label>
-    <label>
-      <div class="t"><b>إخفاء محتوى الأدبي</b><span>يخفي وحدات القسم الأدبي</span></div><input type="checkbox"
-        data-k="hide">
-    </label>
-    <label>
-      <div class="t"><b>استبعاد الأدبي من الإحصائيات</b><span>بيتفعل تلقائياً مع الإخفاء</span></div><input
-        type="checkbox" data-k="exclude">
-    </label>
-    <label>
-      <div class="t"><b>ترتيب الدروس جوا الوحدة</b><span>قبلي، شرح، سبورة، واجب، بعدي، شامل</span></div><input
-        type="checkbox" data-k="sort">
-    </label>
-    <label>
-      <div class="t"><b>حذف المخفي من الإحصائيات</b><span>المواد والأنواع المقفول عينها ما تتحسبش</span></div><input
-        type="checkbox" data-k="dropHidden">
-    </label>
-    <label><div class="t"><b>إظهار الأنواع والمواد الفاضية</b><span>اللي لسه ما فيهاش محتوى (0/0)</span></div><input type="checkbox" data-k="showEmpty"></label>
+    <label><div class="t"><b>عرض التقسيم الجديد (المواد والمحاضرات)</b><span>الإطفاء يرجّع قايمة الموقع الأصلية</span></div><input type="checkbox" data-k="newView"></label>
+    <label><div class="t"><b>إظهار القسم الأدبي</b><span>وحدات القسم الأدبي</span></div><input type="checkbox" data-k="showLit"></label>
+    <label><div class="t"><b>إظهار الأدبي في الإحصائيات</b><span>يشتغل مع المرحلة 2</span></div><input type="checkbox" data-k="statsLit"></label>
+    <label><div class="t"><b>عرض الدروس مرتبة</b><span>قبلي، شرح، سبورة، واجب، بعدي، شامل</span></div><input type="checkbox" data-k="sortLessons"></label>
+    <label><div class="t"><b>إظهار المخفي في الإحصائيات</b><span>يشتغل مع المرحلة 2</span></div><input type="checkbox" data-k="statsHidden"></label>
+    <label><div class="t"><b>إظهار الأنواع والمواد الفاضية</b><span>يشتغل مع المرحلة 2</span></div><input type="checkbox" data-k="showEmpty"></label>
   </main>
   <div class="reset"><button id="resetManual" type="button">مسح تصنيفاتي اليدوية</button></div>
   <footer>افتح موقع نهج الأزهر مرة بعد التحديث عشان تتنقل إعداداتك القديمة.</footer>
   <script src="popup.js"></script>
 </body>
-
 </html>

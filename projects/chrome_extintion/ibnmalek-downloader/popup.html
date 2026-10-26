@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>جامع دروس ابن مالك</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <header><div class="brand-mark">ع</div><div><h1>جامع دروس ابن مالك</h1><p>جمع ذكي · حفظ محلي · استكمال المهام</p></div></header>
+  <section class="notice" id="pageNotice">افتح صفحة المقرر أو الدرس في معهد ابن مالك.</section>
+  <section class="actions">
+    <button id="scanBtn" class="primary">جمع / تحديث بيانات الصفحة</button>
+    <button id="batchScanBtn">فحص ذكي: الجديد أو القديم فقط</button>
+    <button id="forceScanBtn">إعادة فحص كل الدروس الآن</button>
+    <button id="downloadBtn">تحميل المرفقات المكتشفة</button>
+    <button id="printBtn">تجهيز التمارين للطباعة PDF</button>
+    <button id="exportBtn">تصدير فهرس الدروس CSV</button>
+  </section>
+  <section class="settings">
+    <label for="parallel">عدد التنزيلات المتزامنة</label>
+    <select id="parallel"><option value="1">1 — أهدأ</option><option value="2">2 — متوازن</option><option value="3" selected>3 — سريع</option><option value="4">4 — أسرع (ضغط أكبر)</option></select>
+    <label for="quality">جودة الفيديو المطلوبة</label>
+    <select id="quality"><option value="best">الأعلى المتاح</option><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option><option value="360">360p</option></select>
+    <p class="hint">الجودة تُطبّق فقط على ملفات فيديو مباشرة متاحة للتنزيل. روابط YouTube العادية لا تكشف ملف الفيديو أو جودته للإضافة.</p>
+  </section>
+  <section class="progress-card">
+    <div class="section-title"><h2>حالة المهمة</h2><span id="statusPill" class="pill idle">جاهز</span></div>
+    <div class="progress-track"><div id="progressBar"></div></div>
+    <div class="counts"><span>الدروس <b id="lessonCount">0</b></span><span>المرفقات <b id="fileCount">0</b></span><span>المكتمل <b id="doneCount">0</b></span><span>المتبقي <b id="remainingCount">0</b></span><span>بلا فيديو/مرفق <b id="noMediaCount">0</b></span></div>
+    <p class="hint">مش كل درس لازم يكون له فيديو أو مرفق؛ غيابهم طبيعي ومش بيتحسب خطأ.</p>
+    <div id="currentTask" class="current-task">لا توجد مهمة قيد التشغيل.</div>
+  </section>
+  <section class="log-card"><div class="section-title"><h2>سجل العمليات</h2><button id="clearLogBtn" class="text-button">مسح السجل</button></div><ol id="logList"><li class="empty">ستظهر هنا خطوات الإضافة ونتائجها.</li></ol></section>
+  <footer><span id="lastSaved">البيانات محفوظة على هذا المتصفح</span><button id="openSiteBtn" class="text-button">فتح الموقع</button></footer>
+  <script src="popup.js"></script>
+</body></html>

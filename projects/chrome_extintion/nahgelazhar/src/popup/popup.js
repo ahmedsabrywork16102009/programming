@@ -1,14 +1,8 @@
 const KEY = 'nahj_settings';
-const DEF = { inline: true, hide: false, exclude: false, sort: true, dropHidden: true, showEmpty: false };
+const DEF = { newView: true, showLit: true, statsLit: true, sortLessons: true, statsHidden: false, showEmpty: false };
 const inputs = Array.from(document.querySelectorAll('input[data-k]'));
 
-function paint(s) {
-  inputs.forEach(i => {
-    const k = i.dataset.k;
-    i.checked = k === 'exclude' ? !!(s.hide || s.exclude) : !!s[k];
-    i.disabled = k === 'exclude' && !!s.hide;
-  });
-}
+function paint(s) { inputs.forEach(i => { i.checked = !!s[i.dataset.k]; }); }
 
 chrome.storage.local.get(KEY, r => paint(Object.assign({}, DEF, r[KEY] || {})));
 
@@ -23,6 +17,7 @@ inputs.forEach(i => i.addEventListener('change', () => {
 chrome.storage.onChanged.addListener((c, area) => {
   if (area === 'local' && c[KEY]) paint(Object.assign({}, DEF, c[KEY].newValue || {}));
 });
+
 const resetBtn = document.getElementById('resetManual');
 let sure = false;
 resetBtn.addEventListener('click', () => {
@@ -35,7 +30,7 @@ resetBtn.addEventListener('click', () => {
   }
   chrome.storage.local.get(KEY, r => {
     const cur = r[KEY] || {};
-    cur.manualSubs = { u: {}, l: {} };
+    cur.manualL = {}; cur.customSubjects = {}; cur.customLec = {};
     chrome.storage.local.set({ [KEY]: cur });
   });
   sure = false;
