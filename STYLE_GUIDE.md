@@ -11,14 +11,20 @@
 programming/
 ├── libraries/
 │   └── cpp_libraries/         # مكتبات C++ القابلة لإعادة الاستخدام (Header-only)
-│       ├── enumeration.h      # جميع الـ Enums المشتركة
-│       ├── input.h            # دوال إدخال البيانات والتحقق منها
-│       ├── output.h           # دوال الطباعة وتنسيق الشاشات والتقويم
-│       ├── math_utils.h       # دوال العمليات الحسابية والأرقام العشوائية
-│       ├── string_utils.h     # دوال معالجة النصوص والتقطيع والـ trim
-│       ├── datetime.h         # هيكل stDate و stPeriod وحسابات التقويم
-│       ├── process.h          # المجمّع الرئيسي (Façade) يربط المكتبات بـ namespace AS
-│       └── clients.h          # معالجة بيانات العملاء وسجلات الملفات
+│       ├── core/              # الأساسيات المجردة (بدون أي تبعيات)
+│       │   ├── math.h         # دوال العمليات الحسابية والأرقام العشوائية
+│       │   ├── string.h       # دوال معالجة النصوص والتقطيع والـ trim
+│       │   └── datetime.h     # هيكل stDate و stPeriod وحسابات التقويم بـ O(1)
+│       ├── io/                # الإدخال والإخراج عبر الكونسول
+│       │   ├── input.h        # قراءة والتحقق من الأرقام والتواريخ
+│       │   └── output.h       # طباعة الجداول والتقاويم والشاشات
+│       ├── storage/           # التعامل مع الملفات وحفظ السجلات
+│       │   └── file_utils.h   # دوال عامة لحفظ وقراءة الأسطر والملفات
+│       ├── as.h               # المجمّع الشامل لإطار عمل AS (Master Include)
+│       ├── enumeration.h      # الـ Enums المشتركة للتوافقية
+│       ├── process.h          # Forwarder لـ core/ للتوافق مع المشاريع القديمة
+│       ├── input.h / output.h # Forwarders لـ io/ للتوافق مع المشاريع القديمة
+│       └── clients.h          # مكتبة عملاء البنك وسجلات الملفات
 ├── projects/
 │   ├── cpp_projects/          # مشاريع C++ (bank, math-game, rock-paper-scissor)
 │   ├── python_projects/       # مشاريع Python
