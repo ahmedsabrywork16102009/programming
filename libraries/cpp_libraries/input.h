@@ -36,9 +36,7 @@ std::string
 readDateString(std::string_view message = "Enter Date: ",
                std::string_view errorMessage = "Error: Invalid Date!\n");
 
-// =================================================================================
-//  Inputs
-// =================================================================================
+// --- Inputs ---
 
 inline std::string readString(std::string_view message,
                               std::string_view errorMessage) {

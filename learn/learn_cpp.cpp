@@ -17,17 +17,8 @@ using namespace std;
 using namespace AS;
 
 int main() {
+  cout << readNumber<int>("Enter the number: ");
 
-  // stPeriod period = readPeriod();
-  // stPeriod period2 = readPeriod();
-
-  string dateString = readDateString();
-
-  stDate date = convertToDate(dateString);
-
-  cout << dateToString(date) << "\n";
-
-  std::cout << "\U0001F600" << std::endl;
-
+  
   return 0;
 }
