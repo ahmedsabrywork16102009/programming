@@ -100,9 +100,9 @@ void saveDataToFile(const string &fileName,
 
 int getIndexOfClientByAccountNumber(const vector<stClientData> &vClients,
                                     const string &accountNumber) {
-  for (int i = 0; i < vClients.size(); i++) {
+  for (size_t i = 0; i < vClients.size(); i++) {
     if (vClients[i].accountNumber == accountNumber) {
-      return i;
+      return static_cast<int>(i);
     }
   }
 

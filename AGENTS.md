@@ -20,9 +20,9 @@ Always write C++ code in Ahmed Sabry's signature style:
 - Use `#pragma once` at the top of every header.
 - Maintain visual section banners:
   ```cpp
-  // ===========================================================================
+  // =============================================================
   //  Section Title
-  // ===========================================================================
+  // =============================================================
   ```
 - Clear declarations at top (`// --- Declarations ---`), implementations below with `inline`.
 - Export symbols to `namespace AS`.
