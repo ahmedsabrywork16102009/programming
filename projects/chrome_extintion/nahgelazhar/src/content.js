@@ -1,953 +1,610 @@
 (function () {
   'use strict';
 
-  const LAST_KEY = 'nahj_last_unit', SETTINGS_KEY = 'nahj_settings', CACHE_KEY = 'nahj_stats_cache',
-        FAB_KEY = 'nahj_fab_side', ICON_KEY = 'nahj_icons';
-  const log = (...a) => console.log('[Nahj Helper]', ...a);
+  const SETTINGS_KEY = 'nahj_settings', TREES_KEY = 'nahj_trees', OPEN_KEY = 'nahj_open',
+        LAST_KEY = 'nahj_last_lesson', ICON_KEY = 'nahj_icons';
+  const COURSE_ID = '4c086b90-30b2-44cc-a5f9-d2f74a4c3448';
+  const COURSE_KEYS = ['مواد عربية', 'الثالث الثانوي'];
+
   const norm = s => (s || '').replace(/\s+/g, ' ').trim();
   const nrm = s => norm(s).replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه');
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (_) { return d; } };
   const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { } };
+  const hookOn = () => document.documentElement.getAttribute('data-nahj-hook') === '1';
 
-  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-
-  // ===== الإعدادات (محفوظة في chrome.storage عشان نافذة الإضافة تتحكم فيها) =====
+  // ===== الإعدادات =====
   const settings = {
-    hide: false, exclude: false, sort: true, inline: true, dropHidden: true,
-    showEmpty: false, folded: false,
-    hiddenSubs: [], hideDone: false, hiddenTypes: [],
-    manualSubs: { u: {}, l: {} }
+    newView: true, showLit: true, statsLit: true, sortLessons: true, statsHidden: false, showEmpty: false, folded: false,
+    hiddenSubs: [], hiddenTypes: [], hideDone: false,
+    manualL: {}, customSubjects: {}, customLec: {}
   };
+  function migrate(m) {
+    if (!('showLit' in m)) m.showLit = !m.hide;
+    if (!('statsLit' in m)) m.statsLit = !(m.hide || m.exclude);
+    if (!('sortLessons' in m)) m.sortLessons = 'sort' in m ? !!m.sort : true;
+    if (!('statsHidden' in m)) m.statsHidden = 'dropHidden' in m ? !m.dropHidden : false;
+    if (!('newView' in m)) m.newView = true;
+    ['hide', 'exclude', 'sort', 'inline', 'dropHidden', 'manualSubs'].forEach(k => delete m[k]);
+  }
   function saveSettings() {
     try { chrome.storage.local.set({ [SETTINGS_KEY]: settings }); } catch (_) { write(SETTINGS_KEY, settings); }
   }
   function loadSettings(cb) {
     const old = read(SETTINGS_KEY, {});
     const fin = stored => {
-      Object.assign(settings, old, stored || {});
-      const m = settings.manualSubs || {};
-      settings.manualSubs = { u: m.u || {}, l: m.l || {} };
+      const m = Object.assign({}, old, stored || {});
+      migrate(m);
+      Object.assign(settings, m);
+      settings.manualL = settings.manualL || {};
+      settings.customSubjects = settings.customSubjects || {};
+      settings.customLec = settings.customLec || {};
       saveSettings(); cb();
     };
     try { chrome.storage.local.get(SETTINGS_KEY, r => fin(r && r[SETTINGS_KEY])); } catch (_) { fin(null); }
   }
 
-  const cache = read(CACHE_KEY, {});
+  // ===== الحالة =====
+  const trees = read(TREES_KEY, {});
   const icons = read(ICON_KEY, {});
-  let viewMode = 'other';                 // list | unit | other
-  let mountedHost = null, lastBox = null, lastSig = '';
-  let busy = false, cancelScan = false, userMoved = false, skipRestoreOnce = false;
-  let openSet = null;                     // null = آخر وحدة تلقائياً | Set بأسماء الوحدات المفتوحة
-  let statsOpen = new Set();              // الصفوف والمواد المفتوحة في الإحصائيات
-  let editing = null;                     // العنصر اللي بتعدّل تصنيفه دلوقتي
-  let active = false;                     // الإضافة شغالة على الكورس الحالي؟
-  let fab = null, fabSide = read(FAB_KEY, 'right'), timer = null, raf = 0;
+  const openKeys = new Set(read(OPEN_KEY, []));
+  const parentOf = new Map();
+  let model = null, modelId = null, edit = null, query = '', lastLesson = read(LAST_KEY, null);
+  let ready = false, busy = false, active = false, mountedHost = null, userMoved = false, timer = null, reloadArmed = false;
 
-  // ===== المواد =====
-  // [المعرّف، الاسم، كلمات التعرّف عليها (بعد توحيد الهمزات والتاء المربوطة)]
-  const SUBJECTS = [
-    ['adab', 'أدب', ['ادب', 'اتساع نطاق التعليم']],
-    ['nahw', 'نحو', ['نحو', 'اعراب', 'نداء', 'اساليب', 'نواصب', 'جوازم', 'استغاثه', 'ندبه', 'ترخيم']],
-    ['nosos', 'نصوص', ['نصوص']],
-    ['sarf', 'صرف', ['صرف', 'اشتقاق']],
-    ['balagha', 'بلاغة', ['بلاغه']]
-  ];
-  const SUBJ_IDS = new Set(SUBJECTS.map(x => x[0]));
-  // لو وحدة مش بتتصنف لوحدها، اكتب اسمها بالظبط هنا ومادتها، مثال:
-  // 'الامتحان الشامل على ما تم شرحه': ['nahw'],
-  const UNIT_OVERRIDES = {
+  // واجهة للملفات التانية (الإحصائيات في المرحلة 3)
+  const api = window.__nahj = {
+    version: 2, listeners: [], settings,
+    saveSettings: () => saveSettings(),
+    getModel: () => model,
+    subName: id => subName(id),
+    allSubjects: () => allSubjects(),
+    openLesson: id => openLesson(id),
+    onRender(fn) { this.listeners.push(fn); }
   };
+  function emit() { api.listeners.forEach(f => { try { f(); } catch (e) { console.error('[Nahj]', e); } }); }
+
+  // ===== بيانات الكورس (من رد الموقع) =====
+  const TN = { Video: 'فيديو', File: 'ملف', Quiz: 'اختبار', Assignment: 'علامة' };
+  const doneOf = l => l.type === 'Video' ? !!l.isCompleted : l.type === 'File' ? !!l.isFileOpened
+    : l.type === 'Quiz' ? !!l.isQuizSubmitted : l.type === 'Assignment' ? !!l.isAssignmentSubmitted : false;
+  const compact = d => ({
+    id: d.id, name: norm(d.courseName),
+    units: (d.units || []).filter(u => u.active !== false).map(u => ({
+      id: u.id, name: norm(u.unitName), order: u.order,
+      lessons: (u.lessons || []).filter(l => l.active !== false).map(l => ({
+        id: l.id, name: norm(l.lessonName), type: l.type, done: doneOf(l)
+      }))
+    }))
+  });
+  const pathId = () => { const m = location.pathname.match(/\/course(?:-player)?\/([0-9a-f-]{36})/i); return m ? m[1] : null; };
+  const nameOk = n => COURSE_KEYS.every(k => nrm(n || '').includes(nrm(k)));
+  function isTarget() {
+    const id = pathId();
+    if (id === COURSE_ID) return true;
+    return !!(id && trees[id] && nameOk(trees[id].name));
+  }
+  function onTree(json) {
+    const d = json && json.data;
+    if (!d || !d.id || !Array.isArray(d.units)) return;
+    if (d.id !== COURSE_ID && !nameOk(d.courseName)) return;
+    trees[d.id] = compact(d);
+    write(TREES_KEY, trees);
+    try { sessionStorage.removeItem('nahj_rl'); } catch (_) { }
+    console.log('[Nahj] course data captured:', d.units.length, 'units');
+    if (ready) { rebuild(); tick(); }
+  }
+  window.addEventListener('message', e => {
+    if (e.source !== window || !e.data || e.data.source !== 'nahj-hook') return;
+    if (e.data.type === 'tree') onTree(e.data.payload);
+    else if (e.data.type === 'refetch-failed') location.reload();
+  });
+
+  // ===== المواد والتصنيف (الواضح بس، والباقي بتصنفه إنت) =====
+  const SUBJECTS = [
+    ['nahw', 'نحو', ['نحو']], ['adab', 'أدب', ['ادب']], ['sarf', 'صرف', ['صرف']],
+    ['nosos', 'نصوص', ['نصوص']], ['balagha', 'بلاغة', ['بلاغه']]
+  ];
   const isLit = t => nrm(t).includes('ادبي');
   const findSubs = txt => { const n = nrm(txt); return SUBJECTS.filter(x => x[2].some(k => n.includes(k))).map(x => x[0]); };
-  const subMemo = new Map();
-  function subjectsOf(t) {                         // مواد الوحدة: يدوي، وإلا من اسمها، وإلا من أسماء دروسها
-    if (subMemo.has(t)) return subMemo.get(t);
-    let r = [];
-    const man = settings.manualSubs.u[t];
-    if (man) r = man.slice();
-    else if (!isLit(t)) {
-      r = UNIT_OVERRIDES[t] ? UNIT_OVERRIDES[t].slice() : findSubs(t);
-      if (!r.length) {
-        const e = cache[t], cnt = {};
-        ((e && e.lessons) || []).forEach(l => findSubs(l.n).forEach(s => cnt[s] = (cnt[s] || 0) + 1));
-        const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
-        if (top) r = [top[0]];
-      }
-    }
-    r = r.filter(id => SUBJ_IDS.has(id));
-    subMemo.set(t, r);
-    return r;
-  }
-  function lessonSubs(t, l) {                      // مادة الدرس: يدوي، وإلا من اسمه، وإلا من وحدته
-    const man = settings.manualSubs.l[t + '||' + (l.n || '')];
-    if (man) return man.filter(id => SUBJ_IDS.has(id));
-    if (isLit(t)) return [];
-    const own = findSubs(l.n || '');
-    return own.length ? own : subjectsOf(t);
-  }
-  function lessonSubHidden(t, l) {
-    const s = lessonSubs(t, l);
-    return s.length > 0 && s.every(x => settings.hiddenSubs.includes(x));
-  }
-  const tagsHidden = l => l.tags.some(x => settings.hiddenTypes.includes(x));
-  const lessonGone = (t, l) => tagsHidden(l) || lessonSubHidden(t, l);
+  const allSubjects = () => SUBJECTS.map(x => ({ id: x[0], name: x[1] }))
+    .concat(Object.entries(settings.customSubjects).map(([id, name]) => ({ id, name })));
+  const subName = id => (allSubjects().find(s => s.id === id) || {}).name || id;
 
-  // ===== DOM =====
-  const mainEl = () => document.querySelector('main') || document;
-  const q = sel => Array.from(mainEl().querySelectorAll(sel));
-  const getUnits = () => q('button').filter(b => b.querySelector('h3'));
-  const unitTitle = u => norm(u.querySelector('h3').textContent);
-  const unitCard = u => u.parentElement;
-  const isVisible = u => unitCard(u).offsetParent !== null;
-  const findUnit = t => getUnits().find(u => unitTitle(u) === t && isVisible(u));
-  const isDone = b => Array.from(b.querySelectorAll('span')).some(s => norm(s.textContent) === 'مكتمل');
-
-  function unitPage() {
-    const sec = mainEl().querySelector('section');
-    if (!sec || !sec.textContent.includes('دروس الوحدة')) return null;
-    const btns = q('button').filter(b => b.querySelector('h4') && !b.closest('[data-nahj]'));
-    const h1 = sec.querySelector('h1');
-    if (!btns.length || !h1) return null;
-    return { title: norm(h1.textContent), btns };
-  }
-  function syncMode() { viewMode = unitPage() ? 'unit' : (getUnits().length ? 'list' : 'other'); }
-
-  // ===== تحديد الكورس المستهدف =====
-  const COURSE_ID = '4c086b90-30b2-44cc-a5f9-d2f74a4c3448';
-  const COURSE_KEYS = ['مواد عربية', 'الثالث الثانوي'];
-  function isTargetCourse() {
-    if (location.pathname.includes(COURSE_ID)) return true;
-    const sec = mainEl().querySelector('section');
-    if (!sec) return false;
-    const t = nrm(sec.textContent);
-    return COURSE_KEYS.every(k => t.includes(nrm(k)));
-  }
-  function cleanup() {
-    const c = document.getElementById('nahj-stats');
-    if (c) c.remove();
-    closePanels();
-    getUnits().forEach(u => {
-      const card = unitCard(u);
-      card.style.display = ''; card.style.outline = ''; card.style.outlineOffset = '';
-    });
-    mountedHost = null; lastBox = null; lastSig = '';
-    if (fab) fab.style.display = 'none';
-  }
-
-  function waitFor(fn, timeout = 1500) {
-    return new Promise(resolve => {
-      const t = Date.now();
-      (function tick() {
-        const r = fn();
-        if (r) return resolve(r);
-        if (Date.now() - t > timeout) return resolve(null);
-        setTimeout(tick, 16);
-      })();
-    });
-  }
-
-  // ===== تصنيف الدروس =====
   function classify(u, n, t) {
     const a = [];
     if (t === 'فيديو') a.push('video', n.includes('حل') || n.includes('واجب') ? 'hw' : 'explain');
-    else if (t === 'ملف') {
-      if (n.includes('سبورة')) a.push('board');
-      else if (n.includes('واجب') || n.includes('حل')) a.push('hw');
-    } else if (t === 'اختبار') {
-      a.push(u.includes('شامل') || n.includes('شامل') ? 'comp' : n.includes('قبل') ? 'pre' : n.includes('بعد') ? 'post' : 'other');
-    }
+    else if (t === 'ملف') { if (n.includes('سبورة')) a.push('board'); else if (n.includes('واجب') || n.includes('حل')) a.push('hw'); }
+    else if (t === 'اختبار') a.push(u.includes('شامل') || n.includes('شامل') ? 'comp' : n.includes('قبل') ? 'pre' : n.includes('بعد') ? 'post' : 'other');
     return a;
   }
   function rank(u, n, t) {
+    if (t === 'علامة') return 99;
     if (t === 'اختبار') return u.includes('شامل') || n.includes('شامل') ? 8 : n.includes('قبل') ? 0 : 7;
     if (t === 'فيديو') return n.includes('حل') || n.includes('واجب') ? 5 : 1;
     if (t === 'ملف') return n.includes('سبورة') ? 2 : n.includes('واجب') || n.includes('حل') ? 6 : 3;
     return 4;
   }
-  function lessonType(b) {
-    const a = norm(b.querySelector('img')?.alt);
-    return a || ['فيديو', 'ملف', 'اختبار'].find(t => b.textContent.includes(t)) || '';
-  }
+  const sortLessons = arr => arr.slice().sort((a, b) =>
+    (settings.sortLessons ? rank(a.uname, a.name, a.tn) - rank(b.uname, b.name, b.tn) : 0) || a.ord - b.ord);
 
-  // ===== صفحة الوحدة الأصلية: ترتيب + إخفاء =====
-  function sortLessons(title, btns) {
-    if (btns.length < 2) return;
-    const box = btns[0].parentElement, list = btns.filter(b => b.parentElement === box);
-    if (list.length < 2) return;
-    list.forEach((b, i) => { if (b.dataset.nahjOrig === undefined) b.dataset.nahjOrig = i; });
-    const items = list.map(b => ({
-      b, i: +b.dataset.nahjOrig,
-      r: settings.sort ? rank(title, norm(b.querySelector('h4').textContent), lessonType(b)) : 0
-    }));
-    items.sort((x, y) => x.r - y.r || x.i - y.i);
-    if (items.every((x, i) => x.b === list[i])) return;
-    items.forEach(x => box.appendChild(x.b));
+  const ORD = ['', 'الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
+  const TENS = { 20: 'العشرون', 30: 'الثلاثون', 40: 'الأربعون', 50: 'الخمسون' };
+  function ordinalAr(n) {
+    if (n <= 10) return ORD[n];
+    if (n === 11) return 'الحادية عشرة';
+    if (n === 12) return 'الثانية عشرة';
+    if (n < 20) return ORD[n - 10] + ' عشرة';
+    const t = Math.floor(n / 10) * 10, o = n % 10;
+    if (!o) return TENS[t] || ('رقم ' + n);
+    return (o === 1 ? 'الحادية' : ORD[o]) + ' و' + (TENS[t] || t);
   }
-  function applyLessonVis(title, btns) {
-    btns.forEach(b => {
-      const n = norm(b.querySelector('h4').textContent);
-      const byType = classify(title, n, lessonType(b)).some(t => settings.hiddenTypes.includes(t));
-      const subs = lessonSubs(title, { n });
-      const bySub = subs.length > 0 && subs.every(x => settings.hiddenSubs.includes(x));
-      b.style.display = (byType || bySub) ? 'none' : '';
-    });
-  }
+  const key4 = s => nrm(s).replace(/ى/g, 'ي').replace(/\s+/g, '');
+  const sameOrd = (a, b) => key4(a) === key4(b);
+  const lectureTeacher = name => { const m = norm(name).match(/المحاضرة\s+(.+?)\s*(?:[-–—]|$)/); return m ? m[1].trim() : null; };
+  const isMarker = l => l.type === 'Assignment' && /^انتهت محتويات/.test(l.name);
+  const markerTeacher = name => norm(name).replace(/[^\u0600-\u06FF\s]/g, '').replace(/^\s*انتهت محتويات\s*/, '')
+    .replace(/^المحاضرة\s*/, '').replace(/\s*في مادة.*$/, '').trim() || null;
 
-  // ===== تخزين البيانات =====
-  function storeUnit(p) {
-    const t = p.title, e = cache[t] || { lessons: [] };
-    let iconsDirty = false;
-    e.lessons = p.btns.map((b, idx) => {
-      const n = norm(b.querySelector('h4').textContent), ty = lessonType(b);
-      const src = b.querySelector('img')?.getAttribute('src');
-      if (src && icons[ty] !== src) { icons[ty] = src; iconsDirty = true; }
-      return { n, ty, i: b.dataset.nahjOrig !== undefined ? +b.dataset.nahjOrig : idx, tags: classify(t, n, ty), done: isDone(b) };
-    });
-    e.total = e.lessons.length;
-    e.done = e.lessons.filter(l => l.done).length;
-    subMemo.clear();
-    cache[t] = e;
-    write(CACHE_KEY, cache);
-    if (iconsDirty) write(ICON_KEY, icons);
-  }
-  function collectList() {
-    let changed = false;
-    getUnits().forEach(u => {
-      const m = u.textContent.match(/(\d+)\s*\/\s*(\d+)\s*دروس/);
-      if (!m) return;
-      const t = unitTitle(u), e = cache[t] || (cache[t] = { lessons: [] });
-      if (e.done !== +m[1] || e.total !== +m[2]) { e.done = +m[1]; e.total = +m[2]; changed = true; }
-    });
-    if (changed) write(CACHE_KEY, cache);
-  }
-  function needScan(t) {
-    const e = cache[t];
-    if (!e || !e.lessons || !e.lessons.length) return true;
-    return e.lessons.length !== e.total || e.lessons.filter(l => l.done).length !== e.done;
-  }
-  const hasTitles = t => { const e = cache[t]; return !!(e && e.lessons && e.lessons.length && e.lessons.every(l => l.n)); };
-  const needData = t => !hasTitles(t) || needScan(t);
-  function isComplete(t) { const e = cache[t]; return !!(e && e.total && e.done === e.total); }
-
-  // الوحدة تختفي لو كل موادها مخفية، أو كل دروسها مخفية (بالنوع أو بالمادة)
-  function subjectHidden(t) { const s = subjectsOf(t); return s.length > 0 && s.every(x => settings.hiddenSubs.includes(x)); }
-  function allLessonsHidden(t) {
-    const e = cache[t];
-    return !!((settings.hiddenTypes.length || settings.hiddenSubs.length) && e && e.lessons && e.lessons.length && e.lessons.every(l => lessonGone(t, l)));
-  }
-  const unitDropped = t => subjectHidden(t) || allLessonsHidden(t);
-  function unitHidden(u) {
-    const t = unitTitle(u);
-    if (settings.hide && isLit(t)) return true;
-    if (unitDropped(t)) return true;
-    if (settings.hideDone && isComplete(t)) return true;
-    return false;
-  }
-
-  function computeStats() {
-    const s = { subs: {}, scanned: 0, nUnits: 0, all: { d: 0, t: 0 } };
-    ['units', 'video', 'explain', 'board', 'hw', 'pre', 'post', 'comp', 'other'].forEach(k => s[k] = { d: 0, t: 0 });
-    SUBJECTS.forEach(x => s.subs[x[0]] = { d: 0, t: 0 });
-    getUnits().forEach(u => {
-      const t = unitTitle(u);
-      if (isLit(t) && (settings.hide || settings.exclude)) return;
-      const e = cache[t];
-      if (!e) return;
-      const full = !!(e.total && e.done === e.total);
-      if (e.total) subjectsOf(t).forEach(sb => { s.subs[sb].t++; if (full) s.subs[sb].d++; });
-      if (settings.dropHidden && unitDropped(t)) return;
-      if (e.total) { s.units.t++; s.nUnits++; if (full) s.units.d++; if (!needScan(t)) s.scanned++; }
-      (e.lessons || []).forEach(l => {
-        if (settings.dropHidden && lessonSubHidden(t, l)) return;
-        l.tags.forEach(tg => { s[tg].t++; if (l.done) s[tg].d++; });
-        if (l.tags.length && !(settings.dropHidden && tagsHidden(l))) { s.all.t++; if (l.done) s.all.d++; }
-      });
-    });
-    return s;
-  }
-
-  const subLabel = ids => ids.map(id => (SUBJECTS.find(x => x[0] === id) || [])[1]).filter(Boolean).join(' + ') || 'عام';
-
-  // أسماء اللي جوا كل صف في الإحصائيات
-  function listFor(key) {
-    const items = [];
-    getUnits().forEach(u => {
-      const t = unitTitle(u);
-      if (isLit(t) && (settings.hide || settings.exclude)) return;
-      const e = cache[t];
-      if (!e) return;
-      const full = !!(e.total && e.done === e.total);
-      const unitItem = () => ({ n: t, done: full, x: e.done + '/' + e.total, ek: 'u:' + t, sub: subjectsOf(t), man: !!settings.manualSubs.u[t] });
-      if (key === 'u') { if (e.total && !(settings.dropHidden && unitDropped(t))) items.push(unitItem()); return; }
-      if (key.startsWith('s:')) { if (e.total && subjectsOf(t).includes(key.slice(2))) items.push(unitItem()); return; }
-      if (settings.dropHidden && unitDropped(t)) return;
-      const k = key.slice(2);
-      (e.lessons || []).forEach(l => {
-        if (settings.dropHidden && lessonSubHidden(t, l)) return;
-        if (!l.tags.includes(k)) return;
-        const lk = t + '||' + l.n;
-        items.push({
-          n: l.n || 'درس (حدّث الدروس لعرض الاسم)', u: t, done: l.done,
-          ek: l.n ? 'l:' + lk : '', sub: lessonSubs(t, l), man: !!(l.n && settings.manualSubs.l[lk])
+  function buildModel(tree) {
+    const ginfo = {}, units = [];
+    tree.units.forEach((u, ui) => {
+      const lit = isLit(u.name), groups = [];
+      if (u.lessons.some(isMarker)) {
+        let cur = [], g = 0;
+        u.lessons.forEach((l, li) => {
+          cur.push([l, li]);
+          if (isMarker(l)) { groups.push({ base: `u:${u.id}#${g}`, teacher: markerTeacher(l.name), marker: true, tail: false, items: cur }); cur = []; g++; }
         });
+        if (cur.length) groups.push({ base: `u:${u.id}#${g}`, teacher: null, marker: true, tail: true, items: cur });
+      } else groups.push({ base: `u:${u.id}`, teacher: lectureTeacher(u.name), marker: false, tail: false, items: u.lessons.map((l, li) => [l, li]) });
+      groups.forEach(gr => {
+        ginfo[gr.base] = {
+          teacher: gr.teacher, marker: gr.marker, tail: gr.tail, uname: u.name,
+          kind: (gr.marker || gr.teacher) ? 'lecture' : 'exam',
+          order: u.order * 10000 + (gr.items[0] ? gr.items[0][1] : 0)
+        };
       });
-    });
-    return items;
-  }
-
-  // ===== الدروس جوا الصفحة (الشكل القديم) =====
-  const CHEV = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mt-2 h-4 w-4 shrink-0 text-gray-400 sm:mt-0 sm:h-5 sm:w-5" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>';
-  const CHK = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>';
-  const mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
-
-  function rowEl(l) {
-    const b = mk('button', 'flex w-full min-h-14 items-start gap-3 border-b border-green-50 p-3.5 text-right last:border-b-0 hover:bg-green-50/40 sm:items-center sm:gap-4 sm:p-4');
-    b.type = 'button'; b.setAttribute('data-nahj', ''); b.dataset.nahjLesson = l.i;
-    const ic = mk('div', 'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 bg-green-50' + (l.done ? ' ring-2 ring-green-600/30' : ''));
-    if (icons[l.ty]) { const im = mk('img', 'h-7 w-7 object-contain sm:h-8 sm:w-8'); im.src = icons[l.ty]; im.alt = l.ty; ic.appendChild(im); }
-    else ic.textContent = l.ty === 'فيديو' ? '🎬' : l.ty === 'ملف' ? '📄' : '📝';
-    if (l.done) { const bd = mk('span', 'absolute -bottom-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-green-700 text-white shadow'); bd.innerHTML = CHK; ic.appendChild(bd); }
-    const mid = mk('div', 'min-w-0 flex-1');
-    const meta = mk('div', 'flex flex-wrap items-center gap-1.5');
-    meta.appendChild(mk('span', 'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold sm:text-[11px] border border-green-100 bg-green-50 text-green-800', l.ty));
-    if (l.done) meta.appendChild(mk('span', 'text-[10px] font-semibold text-green-700 sm:text-[11px]', 'مكتمل'));
-    mid.append(mk('h4', 'mb-1 break-words text-sm font-bold leading-snug text-green-900 sm:text-base', l.n), meta);
-    b.append(ic, mid);
-    b.insertAdjacentHTML('beforeend', CHEV);
-    return b;
-  }
-
-  function setChev(u, on) {
-    const sv = u.querySelector(':scope > svg');
-    if (sv) { sv.style.transition = 'transform .2s'; sv.style.transform = on ? 'rotate(-90deg)' : ''; }
-  }
-  const removePanel = card => { const p = card.querySelector(':scope > [data-nahj-panel]'); if (p) p.remove(); };
-  function closePanels() {
-    document.querySelectorAll('[data-nahj-panel]').forEach(p => p.remove());
-    getUnits().forEach(u => setChev(u, false));
-  }
-  function showPanel(u) {
-    const t = unitTitle(u), e = cache[t], card = unitCard(u);
-    removePanel(card);
-    if (!e || !hasTitles(t)) { setChev(u, false); return; }
-    const rows = e.lessons.slice()
-      .sort((a, b) => (settings.sort ? rank(t, a.n, a.ty) - rank(t, b.n, b.ty) : 0) || a.i - b.i)
-      .filter(l => !lessonGone(t, l));
-    if (!rows.length) { setChev(u, false); return; }
-    const panel = mk('div', 'border-t border-green-100');
-    panel.setAttribute('data-nahj', ''); panel.setAttribute('data-nahj-panel', ''); panel.dataset.unit = t;
-    rows.forEach(l => panel.appendChild(rowEl(l)));
-    if (needScan(t)) {
-      const f = mk('button', 'w-full p-2.5 text-center text-xs font-semibold text-green-700 hover:bg-green-50/40', '🔄 تحديث حالة الدروس');
-      f.type = 'button'; f.setAttribute('data-nahj', ''); f.dataset.nahjRefresh = '1';
-      panel.appendChild(f);
-    }
-    panel.addEventListener('click', ev => {
-      const r = ev.target.closest('[data-nahj-lesson]');
-      if (r) { const l = e.lessons.find(x => String(x.i) === r.dataset.nahjLesson); if (l) openLesson(t, l); return; }
-      if (ev.target.closest('[data-nahj-refresh]')) loadUnit(t, false);
-    });
-    card.appendChild(panel);
-    setChev(u, true);
-  }
-  function openTitles() {
-    if (openSet === null) { const l = read(LAST_KEY, null); return l ? [l] : []; }
-    return Array.from(openSet);
-  }
-  function syncPanels() {
-    if (!settings.inline) { closePanels(); return; }
-    const want = new Set(openTitles());
-    getUnits().forEach(u => {
-      const t = unitTitle(u);
-      if (want.has(t) && hasTitles(t) && !unitHidden(u)) showPanel(u);
-      else { removePanel(unitCard(u)); setChev(u, false); }
-    });
-  }
-  function scrollToUnit(t, smooth) {
-    const u = findUnit(t);
-    if (!u) return;
-    window.scrollTo({ top: Math.max(0, unitCard(u).getBoundingClientRect().top + window.scrollY - 150), behavior: smooth ? 'smooth' : 'auto' });
-  }
-  function ensureSet() {
-    if (openSet === null) openSet = new Set(Array.from(document.querySelectorAll('[data-nahj-panel]')).map(p => p.dataset.unit));
-    return openSet;
-  }
-  function toggleInline(btn, additive) {
-    const t = unitTitle(btn), card = unitCard(btn), set = ensureSet();
-    const isOpen = !!card.querySelector(':scope > [data-nahj-panel]');
-    if (isOpen) {
-      if (additive || set.size <= 1) { set.delete(t); removePanel(card); setChev(btn, false); }
-      else { set.clear(); set.add(t); syncPanels(); }
-      return;
-    }
-    if (!additive) set.clear();
-    set.add(t);
-    openInline(t, additive);
-  }
-  async function openInline(t, additive) {
-    if (!hasTitles(t)) { await loadUnit(t, !additive); return; }
-    syncPanels();
-    if (!additive) setTimeout(() => scrollToUnit(t, true), 60);
-  }
-
-  // ===== أتمتة التنقل (من ورا نسخة ثابتة من الصفحة) =====
-  function makeOverlay(text, withBar) {
-    const d = document.createElement('div');
-    d.id = 'nahj-scan';
-    d.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(15,42,34,.97);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font:700 18px Cairo,Tahoma,sans-serif;direction:rtl';
-    d.innerHTML = '<div data-m></div>' + (withBar
-      ? '<div style="width:min(320px,80vw);height:8px;border-radius:99px;background:rgba(255,255,255,.2);overflow:hidden"><div data-b style="height:100%;width:0;background:#e0b84a;transition:width .2s"></div></div><button type="button" data-x style="background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:10px;padding:6px 18px;font-size:14px;cursor:pointer">إلغاء</button>'
-      : '');
-    d.querySelector('[data-m]').textContent = text;
-    document.body.appendChild(d);
-    const x = d.querySelector('[data-x]');
-    if (x) x.onclick = () => { cancelScan = true; };
-    return { el: d, msg: d.querySelector('[data-m]'), bar: d.querySelector('[data-b]') };
-  }
-  function makeCover(text) {
-    const root = document.getElementById('root'), first = root && root.firstElementChild;
-    if (!first) return makeOverlay(text, false);
-    const w = document.createElement('div');
-    w.id = 'nahj-scan';
-    w.style.cssText = 'position:fixed;inset:0;z-index:2147483000;overflow:hidden;background:' + getComputedStyle(first).backgroundColor;
-    const c = first.cloneNode(true);
-    c.removeAttribute('id');
-    c.querySelectorAll('[id]').forEach(e => e.removeAttribute('id'));
-    c.querySelectorAll('[data-nahj],[data-nahj-panel]').forEach(e => { e.removeAttribute('data-nahj'); e.removeAttribute('data-nahj-panel'); });
-    c.style.pointerEvents = 'none';
-    w.appendChild(c);
-    const pill = document.createElement('div');
-    pill.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#14532d;color:#fff;padding:6px 16px;border-radius:99px;font:600 13px Cairo,Tahoma,sans-serif;opacity:0;transition:opacity .2s;direction:rtl';
-    pill.textContent = '⏳ ' + text;
-    w.appendChild(pill);
-    document.body.appendChild(w);
-    w.scrollTop = window.scrollY;
-    setTimeout(() => { pill.style.opacity = 1; }, 300);
-    return { el: w, msg: pill };
-  }
-  async function goBack() {
-    const back = q('button').find(b => norm(b.textContent) === 'المنهج');
-    if (back) back.click();
-    await waitFor(() => getUnits().length > 0 && !unitPage(), 5000);
-  }
-  async function enterUnit(t) {
-    const u = getUnits().find(x => unitTitle(x) === t);
-    if (!u) return null;
-    u.click();
-    return await waitFor(() => { const x = unitPage(); return x && x.title === t ? x : null; }, 5000);
-  }
-  async function loadUnit(t, scroll) {
-    if (busy) return;
-    busy = true;
-    const y = window.scrollY;
-    const o = makeCover('جاري تحميل الدروس…');
-    try {
-      const p = await enterUnit(t);
-      if (p) storeUnit(p);
-      await goBack();
-    } catch (err) { log('load error', err); }
-    finally {
-      busy = false; skipRestoreOnce = true;
-      syncMode(); mountedHost = null; tick();
-      window.scrollTo(0, y);
-      setTimeout(() => { o.el.remove(); if (scroll !== false) scrollToUnit(t, true); }, 80);
-    }
-  }
-  async function openLesson(t, l) {
-    if (busy) return;
-    busy = true;
-    const o = makeCover('جاري فتح الدرس…');
-    try {
-      const p = await enterUnit(t);
-      if (p) {
-        storeUnit(p);
-        const b = p.btns.find(x => norm(x.querySelector('h4').textContent) === l.n)
-          || p.btns.find(x => x.dataset.nahjOrig !== undefined && +x.dataset.nahjOrig === l.i);
-        if (b) { b.click(); await waitFor(() => !unitPage(), 2500); }
-      }
-    } catch (err) { log('open lesson error', err); }
-    finally { busy = false; syncMode(); setTimeout(() => { o.el.remove(); tick(); }, 60); }
-  }
-  async function scanAll(btn) {
-    if (busy || viewMode !== 'list') return;
-    const todo = getUnits().map(unitTitle).filter(needData);
-    if (!todo.length) { flash(btn, '✅ كله محدّث'); return; }
-    busy = true; cancelScan = false;
-    const y = window.scrollY;
-    const o = makeOverlay('', true);
-    try {
-      for (let i = 0; i < todo.length && !cancelScan; i++) {
-        o.msg.textContent = `جاري قراءة الوحدات… ${i + 1} / ${todo.length}`;
-        o.bar.style.width = Math.round(i / todo.length * 100) + '%';
-        const p = await enterUnit(todo[i]);
-        if (p) storeUnit(p);
-        await goBack();
-      }
-    } catch (err) { log('scan error', err); }
-    finally {
-      busy = false; skipRestoreOnce = true;
-      syncMode(); mountedHost = null; tick();
-      window.scrollTo(0, y);
-      o.el.remove();
-    }
-  }
-
-  // ===== الكارت (الشكل A) =====
-  const CARDS = [
-    ['units', '📚', 'الوحدات المكتملة'], ['video', '🎬', 'كل الفيديوهات'], ['explain', '🎓', 'فيديوهات الشرح'],
-    ['board', '📝', 'ملفات السبورة'], ['hw', '✍️', 'الواجبات وحلولها'], ['pre', '🔎', 'الاختبارات القبلية'],
-    ['post', '✅', 'الاختبارات البعدية'], ['comp', '🏆', 'الاختبارات الشاملة'], ['other', '🧩', 'اختبارات أخرى']
-  ];
-  const IC = {
-    eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
-    off: '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
-    down: '<path d="m6 9 6 6 6-6"/>',
-    refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
-    copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
-    check: '<path d="M20 6 9 17l-5-5"/>',
-    circle: '<circle cx="12" cy="12" r="10"/>'
-  };
-  const ic = (n, sz) => `<svg xmlns="http://www.w3.org/2000/svg" width="${sz || 16}" height="${sz || 16}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0">${IC[n]}</svg>`;
-  const pct = o => o.t ? Math.round(o.d / o.t * 100) : 0;
-  const hbar = (p, h = 6) => `<div class="bg-green-100" style="flex:1;height:${h}px;border-radius:99px;overflow:hidden"><div class="bg-gold-500" style="width:${p}%;height:100%;border-radius:99px"></div></div>`;
-  const vbar = p => `<div class="bg-green-100" style="width:5px;height:34px;border-radius:3px;display:flex;align-items:flex-end;overflow:hidden;flex-shrink:0"><div class="bg-gold-500" style="width:100%;height:${p}%"></div></div>`;
-  const eyeBtn = (id, on) => `<button type="button" data-eye="${id}" title="${on ? 'إخفاء' : 'إظهار'}" class="text-green-700" style="background:none;border:0;cursor:pointer;padding:4px;display:flex;border-radius:8px">${ic(on ? 'eye' : 'off', 16)}</button>`;
-  const actBtn = (act, icon, label) => `<button type="button" data-act="${act}" class="border border-green-200/70 text-green-800" style="display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:transparent">${ic(icon, 14)}${label}</button>`;
-
-  function subEditor(i) {
-    const cur = i.sub;
-    const chip = (id, label, on) => `<button type="button" data-sub="${id}" data-ekey="${esc(i.ek)}" class="${on ? 'bg-green-700 text-white' : 'border border-green-200/70 text-green-800'}" style="font-size:12px;padding:2px 10px;border-radius:999px;cursor:pointer;${on ? 'border:0;' : 'background:transparent;'}">${label}</button>`;
-    return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px">` +
-      SUBJECTS.map(([id, l]) => chip(id, l, cur.includes(id))).join('') +
-      chip('none', 'عام', i.man && !cur.length) +
-      chip('auto', 'تلقائي', !i.man) + '</div>';
-  }
-  function namesBox(key, title) {
-    const items = listFor(key);
-    const head = title ? `<div class="text-green-800" style="font-size:13px;font-weight:700;margin-bottom:4px">${esc(title)}</div>` : '';
-    if (!items.length) return `<div class="bg-green-50 text-gray-500" style="border-radius:10px;padding:10px 12px;margin:2px 0 8px;font-size:13px">${head}لسه ما اتقرتش. اضغط «تحديث الدروس».</div>`;
-    const done = items.filter(i => i.done).length;
-    const row = i => {
-      const pill = i.ek ? `<button type="button" data-edit="${esc(i.ek)}" title="تعديل التصنيف" class="border border-green-200/70 text-green-700" style="flex-shrink:0;font-size:11px;padding:1px 8px;border-radius:999px;cursor:pointer;background:transparent;${i.man ? 'font-weight:700;' : ''}">${esc(subLabel(i.sub))}${i.man ? ' ✎' : ''}</button>` : '';
-      const editor = i.ek && editing === i.ek ? subEditor(i) : '';
-      return `<div><div style="display:flex;gap:8px;align-items:flex-start;font-size:13px"><span class="${i.done ? 'text-green-700' : 'text-gray-400'}" style="margin-top:2px">${ic(i.done ? 'check' : 'circle', 14)}</span><span class="text-green-900" style="flex:1;min-width:0;word-break:break-word">${esc(i.n)}${i.u ? ` <span class="text-gray-500" style="font-size:12px">· ${esc(i.u)}</span>` : ''}${i.x ? ` <span class="text-gray-500" style="font-size:12px">${i.x}</span>` : ''}</span>${pill}</div>${editor}</div>`;
-    };
-    return `<div class="bg-green-50" style="border-radius:10px;padding:8px 12px;margin:2px 0 8px">${head}<div class="text-gray-500" style="font-size:12px;margin-bottom:6px">${done} من ${items.length} مكتمل</div><div style="max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:6px">${items.map(row).join('')}</div></div>`;
-  }
-
-  function render() {
-    const card = document.getElementById('nahj-stats');
-    if (!card) return;
-    const s = computeStats();
-    const partial = s.scanned < s.nUnits, folded = settings.folded;
-
-    const subOn = id => !settings.hiddenSubs.includes(id);
-    const chips = SUBJECTS
-      .filter(([id]) => s.subs[id].t > 0 || settings.showEmpty || !subOn(id))
-      .map((x, i) => ({ x, i }))
-      .sort((a, b) => (subOn(b.x[0]) - subOn(a.x[0])) || (a.i - b.i))
-      .map(({ x: [id, l] }) => {
-        const o = s.subs[id], on = subOn(id), open = statsOpen.has('s:' + id);
-        return `<div data-exp="s:${id}" class="border border-green-200/70${open ? ' bg-green-50' : ''}" style="flex:1 0 108px;display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:12px;cursor:pointer;${on ? '' : 'opacity:.5;border-style:dashed;'}">` +
-          vbar(pct(o)) +
-          `<div style="flex:1;min-width:0"><div class="text-green-900" style="font-size:13px;font-weight:700">${l}</div><div class="text-gray-500" style="font-size:12px">${o.d}/${o.t}</div></div>` +
-          eyeBtn('s:' + id, on) + '</div>';
-      }).join('');
-    const subBoxes = SUBJECTS.filter(([id]) => statsOpen.has('s:' + id))
-      .map(([id, l]) => `<div style="margin-top:8px">${namesBox('s:' + id, l)}</div>`).join('');
-
-    const typeOn = k => k === 'units' ? !settings.hideDone : !settings.hiddenTypes.includes(k);
-    const rows = CARDS
-      .filter(([k]) => k === 'units' || s[k].t > 0 || settings.showEmpty || settings.hiddenTypes.includes(k))
-      .map((c, i) => ({ c, i }))
-      .sort((a, b) => (typeOn(b.c[0]) - typeOn(a.c[0])) || (a.i - b.i))
-      .map(({ c: [k, icon, l] }) => {
-        const o = s[k], key = k === 'units' ? 'u' : 't:' + k;
-        const on = typeOn(k);
-        const open = statsOpen.has(key);
-        return `<div class="border-t border-green-100"><div data-exp="${key}" style="display:flex;align-items:center;gap:10px;padding:9px 2px;cursor:pointer;${on ? '' : 'opacity:.5;'}">` +
-          `<span class="text-green-900" style="width:150px;font-size:13px;display:flex;gap:6px;align-items:center"><span>${icon}</span>${l}</span>` +
-          hbar(pct(o)) +
-          `<span class="text-gray-600" style="min-width:84px;font-size:12px;text-align:left"><b class="text-green-800">${o.d}</b>/${o.t} · ${pct(o)}%</span>` +
-          eyeBtn(key, on) +
-          `<span class="text-gray-500" style="display:flex;transition:transform .2s;${open ? 'transform:rotate(180deg)' : ''}">${ic('down', 16)}</span></div>` +
-          (open ? namesBox(key) : '') + '</div>';
-      }).join('');
-
-    const foldBtn = `<button type="button" data-act="fold" title="${folded ? 'فتح الإحصائيات' : 'طي الإحصائيات'}" class="border border-green-200/70 text-green-800" style="display:flex;padding:4px;border-radius:8px;cursor:pointer;background:transparent;transition:transform .2s;${folded ? '' : 'transform:rotate(180deg)'}">${ic('down', 16)}</button>`;
-
-    const header =
-      `<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">` +
-      `<div style="display:flex;align-items:center;gap:8px">${foldBtn}<span class="text-green-800 font-thmanyah" style="font-size:16px;font-weight:700">إحصائيات تقدمك</span><span class="bg-gold-50 text-gold-700 border border-gold-200" style="font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px">${pct(s.all)}% من الدروس</span></div>` +
-      (folded ? '' : `<div style="display:flex;gap:6px">${actBtn('scan', 'refresh', 'تحديث الدروس')}${actBtn('showall', 'eye', 'إظهار الكل')}</div>`) +
-      `</div>`;
-
-    const summary =
-      `<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:6px"><span class="text-green-900">${s.units.d} وحدة مكتملة من ${s.units.t}</span><span class="text-gray-500">${pct(s.units)}%</span></div>` +
-      hbar(pct(s.units), 8);
-
-    const details = folded ? '' :
-      (chips ? `<div class="text-gray-500" style="font-size:12px;font-weight:700;margin:16px 0 8px">المواد</div><div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px">${chips}</div>` : '') +
-      subBoxes +
-      `<div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 4px"><span class="text-gray-500" style="font-size:12px;font-weight:700">الأنواع</span>${partial ? `<span class="text-gold-700" style="font-size:12px">محسوبة من ${s.scanned} وحدة من ${s.nUnits} — اضغط «تحديث الدروس»</span>` : ''}</div>` +
-      rows;
-
-    card.innerHTML =
-      `<button type="button" data-act="copy" title="ضغطة = ملخص · Ctrl + ضغطة = تقرير مفصّل" class="bg-white border border-green-200/70 text-green-800" style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;border-radius:999px;padding:5px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.08)">${ic('copy', 15)}<span data-copy-label>نسخ الإحصائيات</span></button>` +
-      `<div style="padding:22px 18px ${folded ? 14 : 10}px">` + header + summary + details + '</div>';
-  }
-
-  function statsText() {
-    const s = computeStats();
-    const lines = ['📊 إحصائيات تقدمي في نهج الأزهر', `إجمالي الدروس: ${pct(s.all)}%`, ''];
-    CARDS.forEach(([k, i, l]) => { const o = s[k]; if (k !== 'other' || o.t) lines.push(`${i} ${l}: ${o.d} / ${o.t} (${pct(o)}%)`); });
-    lines.push('', '🗂️ المواد: ' + SUBJECTS.filter(x => s.subs[x[0]].t).map(x => `${x[1]} ${s.subs[x[0]].d}/${s.subs[x[0]].t}`).join(' | '));
-    if (settings.hide || settings.exclude) lines.push('', '(من غير الأدبي)');
-    return lines.join('\n');
-  }
-
-  // التقرير المفصّل: كل مادة ← وحدة ← درس، وبعدها كل نوع ← دروسه
-  function fullReport() {
-    const s = computeStats();
-    const BAR = '━━━━━━━━━━━━━━━━━━━━';
-    const ti = ty => ty === 'فيديو' ? '🎬' : ty === 'ملف' ? '📄' : '📝';
-    const mark = d => d ? '✅' : '⬜';
-    const units = [];
-    getUnits().forEach((u, idx) => {
-      const title = unitTitle(u);
-      if (isLit(title) && (settings.hide || settings.exclude)) return;
-      const e = cache[title];
-      if (!e || !e.total) return;
-      if (settings.dropHidden && unitDropped(title)) return;
-      units.push({ title, e, n: idx + 1 });
+      units.push({ u, ui, lit, groups });
     });
 
-    const L = [
-      '📊 تقرير تقدمي المفصّل — نهج الأزهر',
-      '📅 ' + new Date().toLocaleDateString('ar-EG'),
-      BAR,
-      `✅ إجمالي الدروس: ${s.all.d}/${s.all.t} (${pct(s.all)}%)`,
-      `📚 الوحدات المكتملة: ${s.units.d}/${s.units.t} (${pct(s.units)}%)`,
-      '', '📈 حسب النوع:'
-    ];
-    CARDS.forEach(([k, i, l]) => { if (k !== 'other' || s[k].t) L.push(`   ${i} ${l}: ${s[k].d}/${s[k].t} (${pct(s[k])}%)`); });
-    const subLines = SUBJECTS.filter(x => s.subs[x[0]].t).map(x => `   🔹 ${x[1]}: ${s.subs[x[0]].d}/${s.subs[x[0]].t} وحدة (${pct(s.subs[x[0]])}%)`);
-    if (subLines.length) L.push('', '🗂️ حسب المادة:', ...subLines);
-    if (settings.hide || settings.exclude) L.push('', '(من غير القسم الأدبي)');
-
-    // ---- التفاصيل حسب المادة ----
-    const groups = new Map();
-    const put = (g, u, l) => {
-      if (!groups.has(g)) groups.set(g, new Map());
-      const m = groups.get(g);
-      if (!m.has(u.title)) m.set(u.title, { n: u.n, e: u.e, ls: [] });
-      if (l) m.get(u.title).ls.push(l);
-    };
-    units.forEach(u => {
-      const lessons = u.e.lessons || [];
-      if (isLit(u.title)) { if (!lessons.length) put('lit', u, null); lessons.forEach(l => put('lit', u, l)); return; }
-      if (!lessons.length) { const us = subjectsOf(u.title); (us.length ? us : ['none']).forEach(g => put(g, u, null)); return; }
-      lessons.forEach(l => {
-        if (settings.dropHidden && lessonSubHidden(u.title, l)) return;
-        const ls = lessonSubs(u.title, l);
-        (ls.length ? ls : ['none']).forEach(g => put(g, u, l));
-      });
-    });
-    const gname = { lit: '🎓 القسم الأدبي', none: '📌 عام (مش تابع لمادة معينة)' };
-    SUBJECTS.forEach(x => { gname[x[0]] = '🔹 ' + x[1]; });
-    L.push('', BAR, '🗂️ التفاصيل حسب المادة', BAR);
-    [...SUBJECTS.map(x => x[0]), 'lit', 'none'].forEach(g => {
-      const m = groups.get(g);
-      if (!m || !m.size) return;
-      let gd = 0, gt = 0;
-      m.forEach(v => v.ls.forEach(l => { gt++; if (l.done) gd++; }));
-      L.push('', `${gname[g]} — ${gd}/${gt} درس (${pct({ d: gd, t: gt })}%)`);
-      m.forEach((v, title) => {
-        if (!v.ls.length) { L.push(`  ⬜ [${v.n}] ${title} — ${v.e.done}/${v.e.total} (الدروس لسه ما اتقرتش)`); return; }
-        const ud = v.ls.filter(l => l.done).length;
-        L.push(`  ${mark(ud === v.ls.length)} [${v.n}] ${title} — ${ud}/${v.ls.length}`);
-        v.ls.slice().sort((a, b) => a.i - b.i).forEach(l => L.push(`      ${mark(l.done)} ${ti(l.ty)} ${l.n || '—'}`));
-      });
-    });
-
-    // ---- التفاصيل حسب النوع ----
-    L.push('', BAR, '📈 التفاصيل حسب النوع', BAR);
-    CARDS.forEach(([k, i, l]) => {
-      const items = listFor(k === 'units' ? 'u' : 't:' + k);
-      if (!items.length) return;
-      L.push('', `${i} ${l} — ${s[k].d}/${s[k].t} (${pct(s[k])}%)`);
-      items.forEach(it => L.push(`  ${mark(it.done)} ${it.n}${it.u ? '  ←  ' + it.u : ''}${it.x ? '  (' + it.x + ')' : ''}`));
-    });
-    L.push('', BAR, '— Nahgelazhar helper');
-    return L.join('\n');
-  }
-
-  async function copyText(t) {
-    try { await navigator.clipboard.writeText(t); return true; }
-    catch (_) {
-      try {
-        const a = document.createElement('textarea');
-        a.value = t; a.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
-        document.body.appendChild(a); a.select();
-        const ok = document.execCommand('copy'); a.remove(); return ok;
-      } catch (__) { return false; }
-    }
-  }
-  const flash = (b, txt) => { const old = b.innerHTML; b.textContent = txt; setTimeout(() => { b.innerHTML = old; }, 1500); };
-
-  function applyHide() {
-    const last = read(LAST_KEY, null);
-    getUnits().forEach(u => {
-      const c = unitCard(u), t = unitTitle(u);
-      c.style.display = unitHidden(u) ? 'none' : '';
-      c.style.outline = t === last ? '2px solid #d4a017' : '';
-      c.style.outlineOffset = t === last ? '2px' : '';
-    });
-  }
-
-  function toggleEye(id) {
-    if (id === 'u') settings.hideDone = !settings.hideDone;
-    else {
-      const [kind, key] = id.split(':');
-      const arr = kind === 's' ? settings.hiddenSubs : settings.hiddenTypes;
-      const i = arr.indexOf(key);
-      if (i >= 0) arr.splice(i, 1); else arr.push(key);
-    }
-    saveSettings();
-    applyHide(); syncPanels(); render();
-  }
-
-  function setManual(ek, id) {                     // حفظ التصنيف اليدوي
-    const store = ek[0] === 'u' ? settings.manualSubs.u : settings.manualSubs.l, key = ek.slice(2);
-    if (id === 'auto') delete store[key];
-    else if (id === 'none') store[key] = [];
-    else {
-      const cur = store[key] ? store[key].slice() : [];
-      const i = cur.indexOf(id);
-      if (i >= 0) cur.splice(i, 1); else cur.push(id);
-      store[key] = cur;
-    }
-    subMemo.clear();
-    saveSettings();
-    applyHide(); syncPanels(); render();
-  }
-
-  function ensureCard() {
-    if (document.getElementById('nahj-stats')) return;
-    const qa = document.getElementById('teacher-qa-heading'), target = qa && qa.closest('section');
-    if (!target) return;
-    const sec = document.createElement('section');
-    sec.id = 'nahj-stats';
-    sec.setAttribute('data-nahj', '');
-    sec.className = 'bg-white rounded-2xl border border-green-200/70 shadow-md shadow-green-900/10 mb-5 sm:mb-7';
-    sec.style.cssText = 'position:relative;margin-top:24px';
-
-    sec.addEventListener('click', async e => {
-      const t = e.target;
-      if (!t.closest) return;
-      const eye = t.closest('[data-eye]');
-      if (eye) { toggleEye(eye.getAttribute('data-eye')); return; }
-      const act = t.closest('[data-act]');
-      if (act) {
-        const a = act.getAttribute('data-act');
-        if (a === 'scan') scanAll(act);
-        else if (a === 'fold') { settings.folded = !settings.folded; saveSettings(); render(); }
-        else if (a === 'showall') {
-          settings.hiddenSubs = []; settings.hiddenTypes = []; settings.hideDone = false;
-          saveSettings(); applyHide(); syncPanels(); render();
-        } else if (a === 'copy') {
-          const full = e.ctrlKey || e.metaKey;
-          const lab = act.querySelector('[data-copy-label]'), old = lab.textContent;
-          const ok = await copyText(full ? fullReport() : statsText());
-          lab.textContent = ok ? (full ? '✅ تم نسخ التقرير المفصّل' : '✅ تم النسخ') : '❌ فشل النسخ';
-          setTimeout(() => { lab.textContent = old; }, 1800);
+    const lessons = [], byId = new Map();
+    units.forEach(({ u, ui, lit, groups }) => {
+      const U = lit ? [] : findSubs(u.name);
+      groups.forEach(gr => gr.items.forEach(([l, li]) => {
+        const tn = TN[l.type] || '';
+        const o = {
+          id: l.id, name: l.name, type: l.type, tn, done: l.done, idx: li, ui, uid: u.id, uname: u.name,
+          uorder: u.order, tags: classify(u.name, l.name, tn), lit, gbase: gr.base, sid: null, base: gr.base,
+          manual: false, ord: u.order * 10000 + li
+        };
+        if (!lit) {
+          const man = settings.manualL[l.id];
+          if (man && man.s) { o.sid = man.s; o.base = man.k || gr.base; o.manual = true; }
+          else if (!gr.tail) {
+            const L = findSubs(l.name);
+            o.sid = L.length === 1 ? L[0] : (L.length === 0 && U.length === 1 ? U[0] : null);
+          }
         }
+        lessons.push(o); byId.set(o.id, o);
+      }));
+    });
+
+    const blocks = new Map(), uncl = new Map(), litG = new Map();
+    const push = (map, key, init, o) => { let g = map.get(key); if (!g) { g = Object.assign({ lessons: [] }, init); map.set(key, g); } g.lessons.push(o); };
+    lessons.forEach(o => {
+      if (o.lit) { push(litG, o.uid, { key: 'lg:' + o.uid, title: o.uname, order: o.uorder }, o); return; }
+      if (o.sid) {
+        const key = o.sid + '|' + o.base;
+        let b = blocks.get(key);
+        if (!b) {
+          const gi = ginfo[o.base], cl = settings.customLec[o.base];
+          b = {
+            sid: o.sid, base: o.base, key, custom: !!cl, kind: cl ? 'lecture' : (gi ? gi.kind : 'lecture'),
+            teacher: gi ? gi.teacher : null, uname: cl ? cl.name : (gi ? gi.uname : o.base),
+            order: gi ? gi.order : o.ord, lessons: [], num: 0
+          };
+          blocks.set(key, b);
+        }
+        if (b.custom) b.order = Math.min(b.order, o.ord);
+        b.lessons.push(o);
         return;
       }
-      const ed = t.closest('[data-edit]');
-      if (ed) { const k = ed.getAttribute('data-edit'); editing = editing === k ? null : k; render(); return; }
-      const sb = t.closest('[data-sub]');
-      if (sb) { setManual(sb.getAttribute('data-ekey'), sb.getAttribute('data-sub')); return; }
-      const ex = t.closest('[data-exp]');
-      if (ex) {                                      // ضغطة عادية: واحد بس، Ctrl: يضيف على المفتوح
-        const k = ex.getAttribute('data-exp'), add = e.ctrlKey || e.metaKey;
-        if (statsOpen.has(k)) {
-          if (add || statsOpen.size <= 1) statsOpen.delete(k);
-          else { statsOpen.clear(); statsOpen.add(k); }
-        } else {
-          if (!add) statsOpen.clear();
-          statsOpen.add(k);
-        }
-        render();
-      }
+      const gi = ginfo[o.gbase] || {};
+      const title = (gi.uname || o.uname) + (gi.marker ? (gi.teacher ? ' · المحاضرة ' + gi.teacher : ' · بعد آخر علامة') : '');
+      push(uncl, o.gbase, { base: o.gbase, title, order: gi.order || o.ord }, o);
     });
 
-    target.parentElement.insertBefore(sec, target);
+    const bySub = new Map();
+    blocks.forEach(b => { if (!bySub.has(b.sid)) bySub.set(b.sid, []); bySub.get(b.sid).push(b); });
+    const subjects = [];
+    bySub.forEach((arr, sid) => {
+      arr.sort((a, b) => a.order - b.order);
+      let n = 0;
+      arr.forEach(b => {
+        if (b.custom) b.label = b.uname;
+        else if (b.kind === 'lecture') {
+          n++; b.num = n;
+          const o = ordinalAr(n);
+          b.label = o + (b.teacher && !sameOrd(o, b.teacher) ? ' · عند المستر: ' + b.teacher : '');
+        } else b.label = b.uname;
+      });
+      subjects.push({ id: sid, name: subName(sid), blocks: arr, ord: arr[0].order });
+    });
+    subjects.sort((a, b) => a.ord - b.ord);
+    return {
+      lessons, byId, subjects, ginfo, blockByKey: blocks,
+      uncl: [...uncl.values()].sort((a, b) => a.order - b.order),
+      lit: [...litG.values()].sort((a, b) => a.order - b.order)
+    };
+  }
+  function rebuild() {
+    const id = pathId(), t = id ? trees[id] : null;
+    model = t ? buildModel(t) : null;
+    modelId = id;
   }
 
-  function refresh() { collectList(); ensureCard(); applyHide(); render(); }
+  // ===== DOM =====
+  const mainEl = () => document.querySelector('main') || document;
+  const getUnits = () => Array.from(mainEl().querySelectorAll('button')).filter(b => b.querySelector('h3'));
+  const unitTitle = u => norm(u.querySelector('h3').textContent);
+  const host = () => { const u = getUnits()[0]; return u ? u.parentElement.parentElement : null; };
+  function waitFor(fn, timeout = 1500) {
+    return new Promise(resolve => {
+      const t = Date.now();
+      (function step() {
+        const r = fn();
+        if (r) return resolve(r);
+        if (Date.now() - t > timeout) return resolve(null);
+        setTimeout(step, 16);
+      })();
+    });
+  }
 
-  // ===== الرجوع لمكانك =====
-  async function restoreScroll() {
-    const last = read(LAST_KEY, null);
-    if (!last) return;
+  // ===== العرض =====
+  const CHEV = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+  const TICK = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+  const chev = open => `<span class="text-gray-500" style="display:flex;transition:transform .2s;${open ? 'transform:rotate(180deg)' : ''}">${CHEV}</span>`;
+  const bar = p => `<div class="bg-green-100" style="height:6px;border-radius:99px;overflow:hidden"><div class="bg-gold-500" style="width:${p}%;height:100%;border-radius:99px"></div></div>`;
+  const cnt = ls => { const d = ls.filter(x => x.done).length; return { d, t: ls.length, p: ls.length ? Math.round(d / ls.length * 100) : 0 }; };
+  const smallBtn = 'border border-green-200/70 text-green-800" style="font-size:12px;padding:5px 12px;border-radius:10px;cursor:pointer;background:transparent;font-weight:700';
+
+  const tagsHidden = l => l.tags.some(t => settings.hiddenTypes.includes(t));
+  const blockLessons = b => sortLessons(b.lessons).filter(l => !tagsHidden(l));
+  const blockVisible = b => { const ls = blockLessons(b); return ls.length > 0 && !(settings.hideDone && ls.every(x => x.done)); };
+  const matchQ = l => !query || nrm(l.name).includes(nrm(query));
+  function visibleFlat() {
+    const out = [];
+    model.subjects.forEach(s => {
+      if (settings.hiddenSubs.includes(s.id)) return;
+      s.blocks.filter(blockVisible).forEach(b => blockLessons(b).forEach(l => out.push(l)));
+    });
+    return out;
+  }
+  function nextLesson() {
+    const flat = visibleFlat().filter(l => l.type !== 'Assignment');
+    if (!flat.length) return null;
+    const i = flat.findIndex(l => String(l.id) === String(lastLesson));
+    for (let k = i + 1; k < flat.length; k++) if (!flat[k].done) return flat[k];
+    return flat.find(l => !l.done) || null;
+  }
+
+  function lecOptions(sid, ownBase) {
+    const sub = model.subjects.find(s => s.id === sid);
+    const opts = (sub ? sub.blocks : []).map(b => ({ base: b.base, label: b.label }));
+    if (ownBase && !opts.some(o => o.base === ownBase)) {
+      const gi = model.ginfo[ownBase];
+      opts.push({ base: ownBase, label: 'وحدتها الأصلية: ' + (gi ? (gi.teacher ? 'المحاضرة ' + gi.teacher : gi.uname) : ownBase) });
+    }
+    return opts;
+  }
+  function editorHtml(ownBase) {
+    const chip = (attr, val, label, on) => `<button type="button" ${attr}="${esc(val)}" class="${on ? 'bg-green-700 text-white' : 'border border-green-200/70 text-green-800'}" style="font-size:12px;padding:3px 11px;border-radius:999px;cursor:pointer;${on ? 'border:0;' : 'background:transparent;'}">${esc(label)}</button>`;
+    let h = `<div class="bg-green-50" style="margin:6px 16px 10px;padding:10px 12px;border-radius:12px"><div class="text-gray-500" style="font-size:12px;margin-bottom:6px">١) اختار المادة</div><div style="display:flex;flex-wrap:wrap;gap:6px">${allSubjects().map(s => chip('data-ps', s.id, s.name, edit.sid === s.id)).join('')}${chip('data-ps', '__ns', '＋ مادة جديدة', false)}</div>`;
+    if (edit.sid) {
+      const o = lecOptions(edit.sid, ownBase);
+      h += `<div class="text-gray-500" style="font-size:12px;margin:10px 0 6px">٢) اختار المحاضرة</div><div style="display:flex;flex-wrap:wrap;gap:6px">${o.map(x => chip('data-pk', x.base, x.label, false)).join('')}${chip('data-pk', '__nl', '＋ محاضرة جديدة', false)}</div>`;
+    }
+    h += `<div style="display:flex;gap:8px;margin-top:10px"><button type="button" data-auto class="border border-green-200/70 text-green-800" style="font-size:12px;padding:3px 11px;border-radius:999px;cursor:pointer;background:transparent">رجّعها تلقائي</button><button type="button" data-cancel class="border border-green-200/70 text-green-800" style="font-size:12px;padding:3px 11px;border-radius:999px;cursor:pointer;background:transparent">إغلاق</button></div></div>`;
+    return h;
+  }
+  function lessonRow(l, noPill) {
+    const hl = String(l.id) === String(lastLesson) ? 'outline:2px solid #d4a017;outline-offset:-3px;' : '';
+    const ico = icons[l.type] ? `<img src="${esc(icons[l.type])}" alt="" style="width:26px;height:26px;object-fit:contain">`
+      : `<span style="font-size:20px">${{ Video: '🎬', File: '📄', Quiz: '📝', Assignment: '🏁' }[l.type] || '📌'}</span>`;
+    const badge = l.done ? `<span class="bg-green-700 text-white" style="position:absolute;bottom:-4px;left:-4px;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center">${TICK}</span>` : '';
+    const label = l.sid ? subName(l.sid) : 'غير مصنّف';
+    const pill = noPill ? '' : `<button type="button" data-edit="l:${l.id}" title="تصنيف" class="border border-green-200/70 ${l.sid ? 'text-green-700' : 'text-gold-700'}" style="flex-shrink:0;font-size:11px;padding:2px 9px;border-radius:999px;cursor:pointer;background:transparent;${l.manual ? 'font-weight:700;' : ''}">${esc(label)}${l.manual ? ' ✎' : ''}</button>`;
+    const ed = !noPill && edit && edit.key === 'l:' + l.id ? editorHtml(l.gbase) : '';
+    return `<div class="border-b border-green-50" style="${hl}"><div data-open="${l.id}" class="hover:bg-green-50/40" style="display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer">` +
+      `<div class="bg-green-50${l.done ? ' ring-2 ring-green-600/30' : ''}" style="position:relative;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ico}${badge}</div>` +
+      `<div style="flex:1;min-width:0"><div class="text-green-900" style="font-size:14px;font-weight:700;word-break:break-word">${esc(l.name)}</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap"><span class="border border-green-100 bg-green-50 text-green-800" style="font-size:11px;padding:1px 8px;border-radius:999px">${esc(l.tn)}</span>${l.done ? '<span class="text-green-700" style="font-size:11px;font-weight:700">مكتمل</span>' : ''}</div></div>${pill}</div>${ed}</div>`;
+  }
+  function sectionShell(inner, cls) {
+    return `<div class="bg-white rounded-2xl border ${cls || 'border-green-200/70'} shadow-md shadow-green-900/10 overflow-hidden" data-nahj>${inner}</div>`;
+  }
+  function blockHtml(s, b) {
+    let ls = blockLessons(b);
+    if (query) ls = ls.filter(matchQ);
+    if (!ls.length) return '';
+    const k = 'b:' + s.id + '|' + b.base, open = query ? true : openKeys.has(k);
+    parentOf.set(k, 's:' + s.id);
+    const c = cnt(ls);
+    const badge = `<span class="bg-white border border-green-200/70 text-green-800" style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${b.num || '📝'}</span>`;
+    let h = `<div data-tg data-k="${esc(k)}" data-p="${esc('s:' + s.id)}" class="border-t border-green-100" style="display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;background:rgba(240,253,244,.5)">${badge}` +
+      `<span class="text-green-900" style="flex:1;min-width:0;font-size:14px;font-weight:700">${esc(b.label)}</span>` +
+      `<span class="${c.d === c.t ? 'text-green-700' : 'text-gray-600'}" style="font-size:12px;white-space:nowrap">${c.d === c.t ? '✅ ' : ''}${c.d}/${c.t} دروس</span>${chev(open)}</div>`;
+    if (open) h += ls.map(l => lessonRow(l)).join('');
+    return h;
+  }
+  function subjectHtml(s) {
+    const blocks = s.blocks.filter(blockVisible);
+    const body = blocks.map(b => blockHtml(s, b)).join('');
+    if (!body) return '';
+    const k = 's:' + s.id, open = query ? true : openKeys.has(k);
+    parentOf.set(k, 'root');
+    const all = blocks.reduce((a, b) => a.concat(blockLessons(b)), []), c = cnt(all);
+    const lec = blocks.filter(b => b.kind === 'lecture').length;
+    const nx = all.find(l => !l.done && l.type !== 'Assignment');
+    let h = `<div data-tg data-k="${esc(k)}" data-p="root" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer">` +
+      `<div class="bg-green-700 text-white" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0">${esc(s.name.slice(0, 1))}</div>` +
+      `<div style="flex:1;min-width:0"><div class="text-green-800 font-thmanyah" style="font-size:17px;font-weight:700">${esc(s.name)}</div><div class="text-gray-500" style="font-size:12px;margin-bottom:6px">${c.d} / ${c.t} درس · ${lec} محاضرة</div>${bar(c.p)}</div>${chev(open)}</div>`;
+    if (nx && !query) h += `<div data-open="${nx.id}" class="text-gray-600 hover:bg-green-50/40" style="display:flex;align-items:center;gap:6px;padding:0 16px 10px;font-size:12px;cursor:pointer;word-break:break-word">▶️ الدرس الجاي: <b class="text-green-800">${esc(nx.name)}</b></div>`;
+    if (open) h += body;
+    return sectionShell(h);
+  }
+  function groupHtml(g) {
+    let ls = sortLessons(g.lessons).filter(l => !tagsHidden(l));
+    if (query) ls = ls.filter(matchQ);
+    if (!ls.length) return '';
+    const k = 'g:' + g.base, open = query ? true : openKeys.has(k);
+    parentOf.set(k, 'uc');
+    let h = `<div data-tg data-k="${esc(k)}" data-p="uc" class="border-t border-green-100" style="display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;background:rgba(254,252,232,.5)">` +
+      `<span class="text-green-900" style="flex:1;min-width:0;font-size:13px;font-weight:700">${esc(g.title)}</span><span class="text-gray-600" style="font-size:12px">${ls.length}</span>` +
+      `<button type="button" data-edit="g:${esc(g.base)}" class="border border-green-200/70 text-green-800" style="font-size:11px;padding:2px 9px;border-radius:999px;cursor:pointer;background:transparent">تصنيف الكل</button>${chev(open)}</div>`;
+    if (edit && edit.key === 'g:' + g.base) h += editorHtml(g.base);
+    if (open) h += ls.map(l => lessonRow(l)).join('');
+    return h;
+  }
+  function unclassifiedHtml() {
+    const body = model.uncl.map(groupHtml).join('');
+    if (!body) return '';
+    const open = query ? true : openKeys.has('uc');
+    parentOf.set('uc', 'root');
+    const total = model.uncl.reduce((n, g) => n + g.lessons.length, 0);
+    let h = `<div data-tg data-k="uc" data-p="root" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer"><div class="bg-gold-50 text-gold-700 border border-gold-200" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🗂️</div><div style="flex:1"><div class="text-gold-700 font-thmanyah" style="font-size:17px;font-weight:700">غير مصنّف</div><div class="text-gray-500" style="font-size:12px">${total} درس مستنيين تصنيفك</div></div>${chev(open)}</div>`;
+    if (open) h += body;
+    return sectionShell(h, 'border-gold-200');
+  }
+  function litHtml() {
+    if (!settings.showLit || !model.lit.length) return '';
+    const all = model.lit.reduce((a, g) => a.concat(g.lessons), []), c = cnt(all);
+    const open = query ? true : openKeys.has('lit');
+    parentOf.set('lit', 'root');
+    let body = model.lit.map(g => {
+      const ls = sortLessons(g.lessons).filter(l => !tagsHidden(l) && matchQ(l));
+      if (!ls.length) return '';
+      const k = g.key, o = query ? true : openKeys.has(k);
+      parentOf.set(k, 'lit');
+      return `<div data-tg data-k="${esc(k)}" data-p="lit" class="border-t border-green-100" style="display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;background:rgba(240,253,244,.5)"><span class="text-green-900" style="flex:1;min-width:0;font-size:14px;font-weight:700">${esc(g.title)}</span><span class="text-gray-600" style="font-size:12px">${ls.filter(x => x.done).length}/${ls.length}</span>${chev(o)}</div>` +
+        (o ? ls.map(l => lessonRow(l, true)).join('') : '');
+    }).join('');
+    if (!body) return '';
+    let h = `<div data-tg data-k="lit" data-p="root" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer"><div class="bg-green-50 text-green-800 border border-green-200" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🎓</div><div style="flex:1"><div class="text-green-800 font-thmanyah" style="font-size:17px;font-weight:700">القسم الأدبي</div><div class="text-gray-500" style="font-size:12px;margin-bottom:6px">${c.d}/${c.t} درس</div>${bar(c.p)}</div>${chev(open)}</div>`;
+    if (open) h += body;
+    return sectionShell(h);
+  }
+  function bannerHtml() {
+    const msg = !hookOn()
+      ? 'الجزء اللي بيلقط بيانات الكورس مش شغال. اتأكد إن Chrome إصدار 111 أو أحدث، وإنك عملت Reload للإضافة من chrome://extensions، وبعدها اضغط F5.'
+      : 'مستنيين بيانات الكورس من الموقع… لو ما ظهرتش خلال ثواني اضغط الزرار.';
+    return sectionShell(`<div class="text-green-900" style="padding:16px;font-size:14px;line-height:1.8">${msg}<div style="margin-top:10px"><button type="button" data-reload class="${smallBtn}">إعادة تحميل الصفحة</button></div></div>`);
+  }
+  function contHtml() {
+    if (query) return '';
+    const l = nextLesson();
+    if (!l) return '';
+    const b = model.blockByKey.get(l.sid + '|' + l.base);
+    return `<div data-open="${l.id}" class="bg-gold-50 border border-gold-200" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;cursor:pointer"><span style="font-size:20px">▶️</span><div style="flex:1;min-width:0"><div class="text-gold-700" style="font-size:14px;font-weight:700">كمّل من حيث وقفت</div><div class="text-green-900" style="font-size:12px;word-break:break-word">${esc(subName(l.sid))}${b ? ' · ' + esc(b.label) : ''}: ${esc(l.name)}</div></div></div>`;
+  }
+  function listHtml() {
+    if (!model) return bannerHtml();
+    const out = model.subjects.filter(s => !settings.hiddenSubs.includes(s.id)).map(subjectHtml).join('') + unclassifiedHtml() + litHtml();
+    return out || sectionShell('<div class="text-gray-500" style="padding:16px;font-size:14px">' + (query ? 'مفيش درس بالاسم ده.' : 'مفيش حاجة تتعرض.') + '</div>');
+  }
+  const $ = id => document.getElementById(id);
+  function renderList() { const el = $('nahj-list'); if (!el) return; parentOf.clear(); el.innerHTML = listHtml(); }
+  function renderCont() { const el = $('nahj-cont'); if (el) el.innerHTML = model ? contHtml() : ''; }
+  function renderView() { renderCont(); renderList(); emit(); }
+
+  // ===== التفاعل =====
+  function toggleKey(el, add) {
+    const k = el.getAttribute('data-k'), p = el.getAttribute('data-p');
+    const sib = [...openKeys].filter(x => x !== k && parentOf.get(x) === p);
+    if (openKeys.has(k)) { if (add || !sib.length) openKeys.delete(k); else sib.forEach(x => openKeys.delete(x)); }
+    else { if (!add) sib.forEach(x => openKeys.delete(x)); openKeys.add(k); }
+    write(OPEN_KEY, [...openKeys]);
+    renderList();
+  }
+  function targetIds() {
+    if (edit.key.startsWith('l:')) return [+edit.key.slice(2)];
+    const gb = edit.key.slice(2);
+    return model.lessons.filter(l => !l.lit && !l.sid && l.gbase === gb).map(l => l.id);
+  }
+  function finishEdit() { edit = null; saveSettings(); rebuild(); renderView(); }
+  function pickSubject(id) {
+    if (id === '__ns') {
+      const n = prompt('اسم المادة الجديدة؟');
+      if (!n || !n.trim()) return;
+      id = 'x:' + n.trim();
+      settings.customSubjects[id] = n.trim();
+      saveSettings();
+    }
+    edit.sid = id;
+    renderList();
+  }
+  function pickLecture(base) {
+    if (!edit || !edit.sid) return;
+    if (base === '__nl') {
+      const n = prompt('اسم المحاضرة الجديدة؟');
+      if (!n || !n.trim()) return;
+      base = 'c:' + n.trim();
+      settings.customLec[base] = { name: n.trim(), s: edit.sid };
+    }
+    targetIds().forEach(id => { settings.manualL[id] = { s: edit.sid, k: base }; });
+    finishEdit();
+  }
+  function resetManual() { targetIds().forEach(id => { delete settings.manualL[id]; }); finishEdit(); }
+  function onViewClick(e) {
+    const t = e.target;
+    if (!t.closest) return;
+    const ed = t.closest('[data-edit]');
+    if (ed) { const k = ed.getAttribute('data-edit'); edit = edit && edit.key === k ? null : { key: k, sid: null }; renderList(); return; }
+    const ps = t.closest('[data-ps]'); if (ps) { pickSubject(ps.getAttribute('data-ps')); return; }
+    const pk = t.closest('[data-pk]'); if (pk) { pickLecture(pk.getAttribute('data-pk')); return; }
+    if (t.closest('[data-auto]')) { resetManual(); return; }
+    if (t.closest('[data-cancel]')) { edit = null; renderList(); return; }
+    if (t.closest('[data-reload]')) { location.reload(); return; }
+    const rf = t.closest('[data-refresh]');
+    if (rf) { rf.textContent = 'جاري التحديث…'; window.postMessage({ source: 'nahj-ext', type: 'refetch' }, '*'); setTimeout(() => { rf.textContent = '🔄 تحديث'; }, 4000); return; }
+    if (t.closest('[data-collapse]')) { openKeys.clear(); write(OPEN_KEY, []); renderList(); return; }
+    const op = t.closest('[data-open]'); if (op) { openLesson(+op.getAttribute('data-open')); return; }
+    const tg = t.closest('[data-tg]'); if (tg) toggleKey(tg, e.ctrlKey || e.metaKey);
+  }
+
+  // ===== فتح الدرس (من جوا الموقع من غير إعادة تحميل، وإلا بالرابط) =====
+  async function openLesson(id) {
+    const l = model && model.byId.get(id);
+    if (!l || busy) return;
+    lastLesson = String(id);
+    write(LAST_KEY, lastLesson);
+    const url = `/course-player/${pathId()}?unit=${l.ui}&lesson=${l.idx}&lessonId=${l.id}`;
+    const btn = getUnits().find(b => unitTitle(b) === l.uname);
+    if (!btn) { location.href = url; return; }
+    busy = true;
+    try {
+      btn.click();
+      const tabs = await waitFor(() => { const t = document.querySelectorAll('[role="tab"]'); return t.length ? Array.from(t) : null; }, 5000);
+      if (!tabs) { location.href = url; return; }
+      const title = t => norm(((t.querySelector('span') || {}).textContent) || '');
+      let want = tabs[l.idx];
+      if (!want || title(want) !== l.name) want = tabs.find(t => title(t) === l.name);
+      if (!want) { location.href = url; return; }
+      const sel = tabs.find(t => t.getAttribute('aria-selected') === 'true');
+      if (sel !== want) want.click();
+    } finally { busy = false; }
+  }
+
+  // ===== التركيب =====
+  function reveal(id) {
+    const l = model && model.byId.get(+id);
+    if (!l) return;
+    if (l.lit) { openKeys.add('lit'); openKeys.add('lg:' + l.uid); }
+    else if (l.sid) { openKeys.add('s:' + l.sid); openKeys.add('b:' + l.sid + '|' + l.base); }
+    else { openKeys.add('uc'); openKeys.add('g:' + l.gbase); }
+  }
+  async function scrollToLast() {
+    if (!lastLesson) return;
     userMoved = false;
-    await sleep(150); if (!userMoved) scrollToUnit(last, false);
-    await sleep(450); if (!userMoved) scrollToUnit(last, false);
-  }
-  function restoreOrY() {
-    if (skipRestoreOnce) { skipRestoreOnce = false; return; }
-    restoreScroll();
+    for (const d of [250, 500]) {
+      await sleep(d);
+      if (userMoved) return;
+      const el = document.querySelector(`[data-open="${lastLesson}"]`);
+      if (el) el.scrollIntoView({ block: 'center' });
+    }
   }
   ['wheel', 'touchstart', 'keydown'].forEach(ev => window.addEventListener(ev, () => { userMoved = true; }, { passive: true }));
 
-  // ===== الزرار العائم =====
-  function placeFab() {
-    if (!fab) return;
-    fab.style.top = 'auto';
-    fab.style.bottom = 'calc(24px + env(safe-area-inset-bottom, 0px))';
-    fab.style.left = fabSide === 'left' ? '16px' : 'auto';
-    fab.style.right = fabSide === 'right' ? '16px' : 'auto';
+  function ensureShell(h) {
+    const v = document.createElement('div');
+    v.id = 'nahj-view';
+    v.setAttribute('data-nahj', '');
+    v.style.cssText = 'display:flex;flex-direction:column;gap:12px;margin-top:8px';
+    v.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 4px"><span class="text-green-800 font-thmanyah" style="font-size:18px;font-weight:700;flex:1;min-width:110px">محتوى المواد</span>` +
+      `<input id="nahj-q" type="search" placeholder="ابحث عن درس…" class="border border-green-200/70 bg-white text-green-900" style="padding:6px 12px;border-radius:10px;font-size:13px;min-width:150px">` +
+      `<button type="button" data-collapse class="${smallBtn}">طي الكل</button><button type="button" data-refresh class="${smallBtn}">🔄 تحديث</button></div>` +
+      `<div id="nahj-cont"></div><div id="nahj-list" style="display:flex;flex-direction:column;gap:12px"></div>`;
+    v.addEventListener('click', onViewClick);
+    v.addEventListener('input', e => { if (e.target.id === 'nahj-q') { query = e.target.value; renderList(); renderCont(); } });
+    v.addEventListener('keydown', e => { if (e.key === 'Escape' && e.target.id === 'nahj-q') { e.target.value = ''; query = ''; renderList(); renderCont(); } });
+    h.parentNode.insertBefore(v, h.nextSibling);
+    return v;
   }
-  function statsAtView() { const c = document.getElementById('nahj-stats'); return !c || c.getBoundingClientRect().bottom > 120; }
-  function updateFab() {
-    if (!fab) return;
-    fab.style.display = viewMode === 'list' ? 'flex' : 'none';
-    if (viewMode !== 'list') return;
-    const d = statsAtView();
-    fab.textContent = d ? '⬇' : '⬆';
-    fab.title = d ? 'انزل لآخر وحدة فتحتها' : 'اطلع للإحصائيات';
+  function mount() {
+    const h = host();
+    if (!h) return;
+    let v = $('nahj-view');
+    if (!settings.newView) { h.style.display = ''; if (v) v.remove(); return; }
+    if (!v) v = ensureShell(h);
+    h.style.display = model ? 'none' : '';
+    renderView();
   }
-  function goDown() {
-    const last = read(LAST_KEY, null);
-    const u = (last && findUnit(last)) || getUnits().find(isVisible);
-    if (u) window.scrollTo({ top: Math.max(0, unitCard(u).getBoundingClientRect().top + window.scrollY - 150), behavior: 'smooth' });
+  function cleanup() {
+    const v = $('nahj-view');
+    if (v) v.remove();
+    const h = host();
+    if (h) h.style.display = '';
+    mountedHost = null;
   }
-  function goUp() {
-    const c = document.getElementById('nahj-stats');
-    if (!c) return window.scrollTo({ top: 0, behavior: 'smooth' });
-    c.style.scrollMarginTop = '90px';
-    c.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-  function createFab() {
-    if (fab) return;
-    fab = document.createElement('button');
-    fab.id = 'nahj-fab'; fab.type = 'button';
-    fab.style.cssText = 'position:fixed;z-index:99999;width:54px;height:54px;border-radius:50%;display:none;align-items:center;justify-content:center;font-size:22px;line-height:1;color:#0f2a22;background:linear-gradient(135deg,#f3d77a,#d4a017);border:3px solid #14532d;box-shadow:0 8px 20px rgba(0,0,0,.3);cursor:grab;touch-action:none;user-select:none;transition:left .25s,right .25s';
-    document.body.appendChild(fab);
-    placeFab();
-    let x = 0, y = 0, drag = false, down = false;
-    fab.addEventListener('pointerdown', e => { down = true; drag = false; x = e.clientX; y = e.clientY; fab.setPointerCapture(e.pointerId); });
-    fab.addEventListener('pointermove', e => {
-      if (!down) return;
-      if (!drag && Math.hypot(e.clientX - x, e.clientY - y) > 8) { drag = true; fab.style.transition = 'none'; fab.style.cursor = 'grabbing'; }
-      if (drag) { fab.style.left = e.clientX - 27 + 'px'; fab.style.right = 'auto'; fab.style.top = e.clientY - 27 + 'px'; fab.style.bottom = 'auto'; }
+  function onPlayerTick() {
+    const id = new URLSearchParams(location.search).get('lessonId');
+    if (id && id !== lastLesson) { lastLesson = id; write(LAST_KEY, id); }
+    let dirty = false;
+    document.querySelectorAll('[role="tab"] img').forEach(im => {
+      const s = im.getAttribute('src') || '';
+      const t = /video/i.test(s) ? 'Video' : /pdf/i.test(s) ? 'File' : /quiz/i.test(s) ? 'Quiz' : /homework/i.test(s) ? 'Assignment' : null;
+      if (t && icons[t] !== s) { icons[t] = s; dirty = true; }
     });
-    fab.addEventListener('pointerup', e => {
-      if (!down) return;
-      down = false; fab.style.cursor = 'grab';
-      if (drag) {
-        fabSide = e.clientX < innerWidth / 2 ? 'left' : 'right';
-        write(FAB_KEY, fabSide);
-        fab.style.transition = 'left .25s,right .25s';
-        placeFab();
-        return;
-      }
-      statsAtView() ? goDown() : goUp();
-    });
+    if (dirty) write(ICON_KEY, icons);
   }
-
-  window.addEventListener('scroll', () => {
-    if (raf) return;
-    raf = requestAnimationFrame(() => { raf = 0; updateFab(); });
-  }, { passive: true });
-
-  // اعتراض كليك الوحدة: عادي = وحدة واحدة، Ctrl = تضيف على اللي مفتوح
-  document.addEventListener('click', e => {
-    if (!e.isTrusted || busy || viewMode !== 'list') return;
-    const b = e.target.closest && e.target.closest('button');
-    if (!b || !b.querySelector('h3')) return;
-    write(LAST_KEY, unitTitle(b));
-    applyHide();
-    if (settings.inline) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      toggleInline(b, e.ctrlKey || e.metaKey);
-    }
-  }, true);
-
-  // ===== المحرك الرئيسي =====
-  function mountList(host) {
-    mountedHost = host;
-    createFab();
-    refresh();
-    syncPanels();
-    restoreOrY();
+  function armReload() {
+    if (reloadArmed) return;
+    reloadArmed = true;
+    setTimeout(() => {
+      let done = false;
+      try { done = !!sessionStorage.getItem('nahj_rl'); } catch (_) { }
+      if (!model && !done) { try { sessionStorage.setItem('nahj_rl', '1'); } catch (_) { } location.reload(); }
+    }, 4500);
   }
-  function bounce() {
-    if (busy || !settings.inline || !unitPage()) return;
-    const back = q('button').find(b => norm(b.textContent) === 'المنهج');
-    if (back) back.click();
-  }
-
   function tick() {
     if (busy) return;
-    if (!isTargetCourse()) {                        // مش الكورس بتاعنا: ما نلمسش أي حاجة
-      if (active) { cleanup(); active = false; }
-      viewMode = 'other';
-      return;
-    }
+    if (!isTarget()) { if (active) { cleanup(); active = false; } return; }
     active = true;
-    const prev = viewMode, p = unitPage();
-    if (p) {
-      viewMode = 'unit';
-      sortLessons(p.title, p.btns);
-      applyLessonVis(p.title, p.btns);
-      const box = p.btns[0].parentElement;
-      const sig = p.title + '|' + p.btns.map(b => norm(b.querySelector('h4').textContent) + (isDone(b) ? 1 : 0)).sort().join('~');
-      if (box !== lastBox || sig !== lastSig) {
-        lastBox = box; lastSig = sig;
-        storeUnit(p);
-        write(LAST_KEY, p.title);
-        if (openSet === null) openSet = new Set([p.title]); else openSet.add(p.title);
-      }
-      if (prev !== 'unit' && settings.inline) setTimeout(bounce, 120);
-      updateFab();
-      return;
-    }
-    const units = getUnits();
-    if (units.length) {
-      viewMode = 'list';
-      const host = units[0].parentElement.parentElement;
-      if (host !== mountedHost) mountList(host);
-      else if (!document.getElementById('nahj-stats')) refresh();
-    } else viewMode = 'other';
-    updateFab();
+    if (location.pathname.includes('/course-player/')) { onPlayerTick(); return; }
+    const h = host();
+    if (!h) return;
+    if (!model || modelId !== pathId()) rebuild();
+    if (!model && hookOn()) armReload();
+    if (h !== mountedHost) {
+      mountedHost = h;
+      if (lastLesson && model) reveal(lastLesson);
+      mount();
+      scrollToLast();
+    } else if (!$('nahj-view') || (settings.newView && model && h.style.display !== 'none')) mount();
   }
 
-  function onSettingsChanged() {
-    subMemo.clear();
-    if (viewMode === 'list') { applyHide(); syncPanels(); render(); }
-    else if (viewMode === 'unit') tick();
+  function start() {
+    loadSettings(() => {
+      ready = true;
+      try {
+        chrome.storage.onChanged.addListener((ch, area) => {
+          if (area !== 'local' || !ch[SETTINGS_KEY]) return;
+          const nv = ch[SETTINGS_KEY].newValue || {};
+          if (Object.keys(nv).every(k => JSON.stringify(nv[k]) === JSON.stringify(settings[k]))) return;
+          Object.assign(settings, nv);
+          rebuild(); mount();
+        });
+      } catch (_) { }
+      new MutationObserver(m => {
+        if (m.every(x => x.target.nodeType === 1 && x.target.closest && x.target.closest('[data-nahj]'))) return;
+        clearTimeout(timer);
+        timer = setTimeout(tick, 200);
+      }).observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
+      rebuild();
+      tick();
+    });
   }
-
-  loadSettings(() => {
-    try {
-      chrome.storage.onChanged.addListener((ch, area) => {
-        if (area !== 'local' || !ch[SETTINGS_KEY]) return;
-        const nv = ch[SETTINGS_KEY].newValue || {};
-        if (Object.keys(nv).every(k => JSON.stringify(nv[k]) === JSON.stringify(settings[k]))) return;
-        Object.assign(settings, nv);
-        onSettingsChanged();
-      });
-    } catch (_) { }
-    new MutationObserver(m => {
-      if (m.every(x => x.target.nodeType === 1 && x.target.closest('[data-nahj]'))) return;
-      clearTimeout(timer);
-      timer = setTimeout(tick, 200);
-    }).observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
-    tick();
-  });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 })();

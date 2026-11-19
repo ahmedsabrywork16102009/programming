@@ -2,6 +2,7 @@
   'use strict';
   if (window.__nahjHook) return;
   window.__nahjHook = true;
+  document.documentElement.setAttribute('data-nahj-hook', '1');
 
   const RE = /\/Course\/tree-course-with-progress/i;
   let last = null;

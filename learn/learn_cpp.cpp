@@ -1,24 +1,22 @@
-#include "../libraries/cpp_libraries/enumeration.h"
 #include "../libraries/cpp_libraries/input.h"
 #include "../libraries/cpp_libraries/output.h"
 #include "../libraries/cpp_libraries/process.h"
 
-#include <cstddef>
-#include <cstdio>
-#include <ctime>
-#include <fstream>
-#include <iomanip>
 #include <iostream>
-#include <string>
-#include <string_view>
-#include <vector>
 
 using namespace std;
 using namespace AS;
 
 int main() {
-  cout << readNumber<int>("Enter the number: ");
+    int number1 = readNumber<int>("Enter number1: ");
+    int number2 = readNumber<int>("Enter number2: ");
+    int number3 = readNumber<int>("Enter number3: ");
 
-  
-  return 0;
+    cout << "\n";
+    cout << "Sum: " << sumRangeWithStep(number1, number2, number3) << "\n";
+    cout << "Product: " << productRangeWithStep(number1, number2, number3) << "\n";
+    cout << "Divide: " << divideRangeWithStep(number1, number2, number3) << "\n";
+    cout << "Power: " << powerRangeWithStep(number1, number2, number3) << "\n";
+
+    return 0;
 }
