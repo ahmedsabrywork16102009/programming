@@ -51,6 +51,3 @@ enum enDateFormat {
 
 } // namespace enumeration
 
-namespace AS {
-using namespace enumeration;
-}

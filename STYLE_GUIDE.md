@@ -86,7 +86,7 @@ namespace AS {
 
 وفي كود التطبيقات والمشاريع، يُستدعى بالشكل القياسي:
 ```cpp
-#include "../../../libraries/cpp_libraries/input.h"
+#include "../../../libraries/cpp_libraries/io/input.h"
 #include "../../../libraries/cpp_libraries/process.h"
 
 using namespace std;

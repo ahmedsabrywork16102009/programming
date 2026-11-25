@@ -1,3 +1,6 @@
+
+#include "../../../libraries/cpp_libraries/domain/bank.h"
+
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
@@ -8,7 +11,7 @@
 #include <thread>
 #include <vector>
 
-#include "../../../libraries/cpp_libraries/input.h"
+#include "../../../libraries/cpp_libraries/io/input.h"
 #include "../../../libraries/cpp_libraries/process.h"
 
 using namespace std;
@@ -19,362 +22,26 @@ static const string g_usersFileName = "files/Users.txt";
 enum enMainMinuChoice { eShowClientList = 1, eAddNewClient = 2, eDeleteClient = 3, eUpdateClient = 4, eFindClient = 5, eTransactions = 6, eManageUsers = 7, eLogOut = 8 };
 enum enManageUsers { eShowUsersList = 1, eAddNewUser = 2, eDeleteUser = 3, eUpdateUser = 4, eFindUser = 5, eBackMainMenu = 6 };
 enum enTransactions { eDeposit = 1, eWithdraw = 2, eTotalBalances = 3, eBackToMainMenu = 4 };
+enum stType { CLIENT_DATA = 0, USER_DATA = 1 };
 
-struct stClientData {
-	string accountNumber;
-	string pinCode;
-	string fullName;
-	string phone;
-	double accountBalance;
-};
+bank::stClientData readNewClient(vector<bank::stClientData> &vClients) { return bank::readNewRecord(vClients); }
 
-struct stUser {
-	string userName;
-	string password;
-	short permission;
-};
+bank::stUser readNewUser(vector<bank::stUser> &vUsers) { return bank::readNewRecord(vUsers); }
 
-stClientData convertClientLineDataToRecord(string text, string_view delimiter = "#//#") {
-	stClientData clientData;
+bool updateClientData(bank::stClientData &clientData) { return bank::updateRecord(clientData); }
 
-	vector<string> vTokens = process::splitByString(text, delimiter);
+bool updateUserData(bank::stUser &userData) { return bank::updateRecord(userData); }
 
-	clientData.accountNumber = vTokens[0];
-	clientData.pinCode = vTokens[1];
-	clientData.fullName = vTokens[2];
-	clientData.phone = vTokens[3];
-	clientData.accountBalance = stod(vTokens[4]);
+bool deleteClient(vector<bank::stClientData> &vClients, const string &accountNumber) {
+	bool deleted = bank::deleteRecord(vClients, accountNumber, [](const bank::stClientData &, int) { return false; }, "Client");
 
-	return clientData;
-}
-stUser convertUsersLineToRecord(string text, string_view delimiter = "#//#") {
-	stUser user;
-
-	vector<string> vTokens = process::splitByString(text, delimiter);
-
-	user.userName = vTokens[0];
-	user.password = vTokens[1];
-	user.permission = stoi(vTokens[2]);
-
-	return user;
+	return deleted;
 }
 
-string convertRecordToLine(const stUser &user, string_view seperator = "#//#") {
-	string line = "";
+bool deleteUser(vector<bank::stUser> &vUsers, const string &userName) {
+	bool deleted = bank::deleteRecord(vUsers, userName, [](const bank::stUser &user, int index) { return index == 0 || user.userName == "admin"; }, "User");
 
-	line.append(user.userName).append(seperator);
-	line.append(user.password).append(seperator);
-	line.append(to_string(user.permission));
-
-	return line;
-}
-
-string convertRecordToLine(const stClientData &clientData, string_view seperator = "#//#") {
-	string line = "";
-
-	line.append(clientData.accountNumber).append(seperator);
-	line.append(clientData.pinCode).append(seperator);
-	line.append(clientData.fullName).append(seperator);
-	line.append(clientData.phone).append(seperator);
-	line.append(to_string(clientData.accountBalance));
-
-	return line;
-}
-
-vector<stClientData> loadClientDataFromFile(const string &fileName) {
-	vector<stClientData> vClients;
-	fstream myFile;
-
-	myFile.open(fileName, ios::in);
-
-	if (myFile.is_open()) {
-		string lineData;
-
-		while (getline(myFile, lineData)) {
-			vClients.push_back(convertClientLineDataToRecord(lineData));
-		}
-
-		myFile.close();
-	}
-
-	return vClients;
-}
-
-vector<stUser> loadUsersDataFromFile(const string &fileName) {
-	vector<stUser> vUsers;
-	fstream myFile;
-
-	myFile.open(fileName, ios::in);
-
-	if (myFile.is_open()) {
-		string lineData;
-
-		while (getline(myFile, lineData)) {
-			vector<string> vTokens = process::splitByString(lineData, "#//#");
-			if (vTokens.size() == 3 && !vTokens[0].empty() && !vTokens[1].empty()) {
-				vUsers.push_back(convertUsersLineToRecord(lineData));
-			}
-		}
-
-		myFile.close();
-	}
-
-	return vUsers;
-}
-
-void saveDataToFile(const string &fileName, const vector<stClientData> &vClientData) {
-	fstream myFile;
-	myFile.open(fileName, ios::out);
-	string lineData = "";
-
-	if (myFile.is_open()) {
-		for (const auto &clientData : vClientData) {
-			lineData = convertRecordToLine(clientData);
-			myFile << lineData << "\n";
-		}
-
-		myFile.close();
-	}
-}
-
-void saveDataToFile(const string &fileName, const vector<stUser> &vUsers) {
-	fstream myFile;
-	myFile.open(fileName, ios::out);
-
-	if (myFile.is_open()) {
-		for (const auto &user : vUsers) {
-			myFile << convertRecordToLine(user) << "\n";
-		}
-
-		myFile.close();
-	}
-}
-
-int getIndexOfClientByAccountNumber(const vector<stClientData> &vClients, const string &accountNumber) {
-	for (size_t i = 0; i < vClients.size(); i++) {
-		if (vClients[i].accountNumber == accountNumber) {
-			return static_cast<int>(i);
-		}
-	}
-
-	return -1;
-}
-
-int getIndexOfUserByUsername(const vector<stUser> &vUsers, const string &username) {
-	for (size_t i = 0; i < vUsers.size(); i++) {
-		if (vUsers[i].userName == username) {
-			return static_cast<int>(i);
-		}
-	}
-
-	return -1;
-}
-
-bool isClientFound(const vector<stClientData> &vClients, const string &accountNumber) { return getIndexOfClientByAccountNumber(vClients, accountNumber) != -1; }
-bool isUserFound(const vector<stUser> &vUsers, const string &username) { return getIndexOfUserByUsername(vUsers, username) != -1; }
-
-void printClientDataVertical(const vector<stClientData> &vClients, int indexOfClient) {
-	cout << "Account Number  : " << vClients[indexOfClient].accountNumber << "\n";
-	cout << "Pin Code        : " << vClients[indexOfClient].pinCode << "\n";
-	cout << "Full Name       : " << vClients[indexOfClient].fullName << "\n";
-	cout << "Phone Number    : " << vClients[indexOfClient].phone << "\n";
-	cout << "Account Balance : " << vClients[indexOfClient].accountBalance << "\n";
-}
-
-void printClientDataVertical(const stClientData &clientData) {
-	cout << "Account Number  : " << clientData.accountNumber << "\n";
-	cout << "Pin Code        : " << clientData.pinCode << "\n";
-	cout << "Full Name       : " << clientData.fullName << "\n";
-	cout << "Phone Number    : " << clientData.phone << "\n";
-	cout << "Account Balance : " << clientData.accountBalance << "\n";
-}
-
-void printUserDataVertical(const vector<stUser> &vUsers, int indexOfUser) {
-	cout << "User Name       : " << vUsers[indexOfUser].userName << "\n";
-	cout << "Password        : " << vUsers[indexOfUser].password << "\n";
-	cout << "Permission      : " << vUsers[indexOfUser].permission << "\n";
-}
-
-void printUserDataVertical(const stUser &userData) {
-	cout << "User Name       : " << userData.userName << "\n";
-	cout << "Password        : " << userData.password << "\n";
-	cout << "Permission      : " << userData.permission << "\n";
-}
-
-void printFindResult(const vector<stClientData> &vClients, int index) {
-	if (index != -1) {
-		cout << "\nClient Found:\n";
-		printClientDataVertical(vClients, index);
-	} else {
-		cout << "\nClient Not Found!\n";
-	}
-}
-
-void printFindResult(const vector<stUser> &vUsers, int index) {
-	if (index != -1) {
-		cout << "\nUser Found:\n";
-		printUserDataVertical(vUsers, index);
-	} else {
-		cout << "\nUser Not Found!\n";
-	}
-}
-
-stClientData readNewClient(vector<stClientData> &vClients) {
-	stClientData clientData;
-	bool isRepeated = false;
-
-	do {
-		if (isRepeated) {
-			cout << "Client with [" << clientData.accountNumber << "] is already exists, try again.\n";
-		}
-		isRepeated = true;
-
-		clientData.accountNumber = input::readString("Enter Account Number: ");
-	} while (isClientFound(vClients, clientData.accountNumber));
-
-	clientData.pinCode = input::readString("Enter Pin Code: ");
-	clientData.fullName = input::readString("Enter Full Name: ");
-	clientData.phone = input::readString("Enter Phone: ");
-	clientData.accountBalance = input::readNumber<double>("Enter Account Balance: ");
-
-	return clientData;
-}
-
-void whatPermissionToGive(short &permission) {
-	permission = 0;
-
-	if (input::readBool("Do you want to give permission to Show client list? [1] Yes [0] No: ")) permission |= 1 << 0;  // Bit 0: Show client list
-	if (input::readBool("Do you want to give permission to Add new client? [1] Yes [0] No: ")) permission |= 1 << 1;    // Bit 1: Add new client
-	if (input::readBool("Do you want to give permission to Delete client? [1] Yes [0] No: ")) permission |= 1 << 2;     // Bit 2: Delete client
-	if (input::readBool("Do you want to give permission to Update client? [1] Yes [0] No: ")) permission |= 1 << 3;     // Bit 3: Update client
-	if (input::readBool("Do you want to give permission to Find client? [1] Yes [0] No: ")) permission |= 1 << 4;       // Bit 4: Find client
-	if (input::readBool("Do you want to give permission to Transactions? [1] Yes [0] No: ")) permission |= 1 << 5;      // Bit 5: Transactions
-	if (input::readBool("Do you want to give permission to Manage users? [1] Yes [0] No: ")) permission |= 1 << 6;      // Bit 6: Manage users
-}
-
-stUser readNewUser(vector<stUser> &vUsers) {
-	stUser userData;
-	bool isRepeated = false;
-
-	do {
-		if (isRepeated) {
-			cout << "User with [" << userData.userName << "] already exists, try again.\n";
-		}
-		isRepeated = true;
-
-		userData.userName = input::readString("Enter Username: ");
-	} while (isUserFound(vUsers, userData.userName));
-
-	userData.password = input::readString("Enter Password: ");
-	if (input::readBool("Do you want to give Full access permission? [1] Yes [0] No: ")) {
-		userData.permission = -1;
-	} else {
-		cout << "Select the permissions to grant this user:-\n";
-
-		whatPermissionToGive(userData.permission);
-	}
-
-	return userData;
-}
-
-bool updateClientData(stClientData &clientData) {
-	printClientDataVertical(clientData);
-
-	if (input::readBool("Are you sure you want to update this client [1] Yes [0] No: ")) {
-		if (input::readBool("Do you want to update account number? ")) {
-			clientData.accountNumber = input::readString("Enter Account Number: ");
-		}
-
-		if (input::readBool("Do you want to update pin code? ")) {
-			clientData.pinCode = input::readString("Enter Pin Code: ");
-		}
-
-		if (input::readBool("Do you want to update full name? ")) {
-			clientData.fullName = input::readString("Enter Full Name: ");
-		}
-
-		if (input::readBool("Do you want to update phone? ")) {
-			clientData.phone = input::readString("Enter Phone: ");
-		}
-
-		if (input::readBool("Do you want to update account balance? ")) {
-			clientData.accountBalance = input::readNumber<double>("Enter Account Balance: ");
-		}
-		return true;
-	}
-
-	return false;
-}
-
-bool updateUserData(stUser &userData) {
-	printUserDataVertical(userData);
-
-	if (input::readBool("Are you sure you want to update this user [1] Yes [0] No: ")) {
-		if (input::readBool("Do you want to update username? ")) {
-			userData.userName = input::readString("Enter Username: ");
-		}
-
-		if (input::readBool("Do you want to update password? ")) {
-			userData.password = input::readString("Enter Password: ");
-		}
-
-		if (input::readBool("Do you want to update permission? ")) {
-			if (input::readBool("Do you want to give Full access permission? [1] Yes [0] No: ")) {
-				userData.permission = -1;
-			} else {
-				cout << "Select the permissions to grant this user:-\n";
-
-				whatPermissionToGive(userData.permission);
-			}
-		}
-		return true;
-	}
-
-	return false;
-}
-
-bool deleteClient(vector<stClientData> &vClients, const string &accountNumber) {
-	int indexOfClient = getIndexOfClientByAccountNumber(vClients, accountNumber);
-
-	if (indexOfClient == -1) {
-		return false;
-	}
-
-	printClientDataVertical(vClients, indexOfClient);
-
-	if (input::readBool("Are you sure you want to delete this client [1] Yes [0] No: ")) {
-		vClients.erase(vClients.begin() + indexOfClient);
-		cout << "Client Deleted Successfully!\n";
-
-		system("pause");
-		return true;
-	}
-	cout << "Operation Cancelled!\n";
-
-	system("pause");
-	return false;
-}
-
-bool deleteUser(vector<stUser> &vUsers, const string &userName) {
-	int indexOfUser = getIndexOfUserByUsername(vUsers, userName);
-
-	if (indexOfUser == -1) {
-		return false;
-	}
-
-	printUserDataVertical(vUsers, indexOfUser);
-
-	if (input::readBool("Are you sure you want to delete this user [1] Yes [0] No: ")) {
-		vUsers.erase(vUsers.begin() + indexOfUser);
-		cout << "User Deleted Successfully!\n";
-
-		system("pause");
-		return true;
-	}
-	cout << "Operation Cancelled!\n";
-
-	system("pause");
-	return false;
+	return deleted;
 }
 
 void printMainMenueScreen() {
@@ -392,125 +59,61 @@ void printMainMenueScreen() {
 	cout << "===========================================\n";
 }
 
-void printClientsInTableView(const vector<stClientData> &vClients) {
-	string_view line =
-	    "---------------------------------------------------------"
-	    "----------------------------";
-	cout << "\n" << setw(45) << "Number of Clients: " << vClients.size() << "\n";
-	cout << line << endl;
-	cout << "| " << left << setw(10) << "Account Number" << " | " << left << setw(10) << "Pin Code" << " | " << left << setw(20) << "Full Name"
-	     << " | " << left << setw(15) << "Phone" << " | " << left << setw(10) << "Balance" << " |\n";
-	cout << line << endl;
+void printClientsInTableView(const vector<bank::stClientData> &vClients) { bank::printRecordsInTableView(vClients); }
 
-	for (const auto &clientData : vClients) {
-		cout << "| " << left << setw(14) << clientData.accountNumber << " | " << left << setw(10) << clientData.pinCode << " | " << left << setw(20) << clientData.fullName << " | " << left << setw(15) << clientData.phone << " | " << left << setw(10) << clientData.accountBalance << " |\n";
-	}
-	cout << line << "\n";
+void printUsersInTableView(const vector<bank::stUser> &vUsers) { bank::printRecordsInTableView(vUsers); }
 
-	system("pause");
-}
-
-void printUsersInTableView(const vector<stUser> &vUsers) {
-	const string line(52, '-');
-	cout << "\n" << setw(45) << "Number of Users: " << vUsers.size() << "\n";
-	cout << line << "\n";
-	cout << "| " << left << setw(16) << "User Name" << " | " << setw(14) << "Password" << " | " << setw(12) << "Permission" << " |\n";
-	cout << line << "\n";
-
-	for (const auto &userData : vUsers) {
-		cout << "| " << left << setw(16) << userData.userName << " | " << setw(14) << userData.password << " | " << setw(12) << userData.permission << " |\n";
-	}
-	cout << line << "\n";
-
-	system("pause");
-}
-
-void addNewClientScreen(vector<stClientData> &vClients) {
+void addNewClientScreen(vector<bank::stClientData> &vClients) {
 	do {
 		vClients.push_back(readNewClient(vClients));
 	} while (input::readBool("Do you want to add another client [1-Yes] [0-No]: "));
-
-	system("pause");
 }
 
-void addNewUserScreen(vector<stUser> &vUsers) {
+void addNewUserScreen(vector<bank::stUser> &vUsers) {
 	do {
 		vUsers.push_back(readNewUser(vUsers));
 	} while (input::readBool("Do you want to add another user [1-Yes] [0-No]: "));
 }
 
-void updateClientScreen(vector<stClientData> &vClients) {
-	int indexOfClient = getIndexOfClientByAccountNumber(vClients, input::readString("Enter Account Number: "));
+void updateClientScreen(vector<bank::stClientData> &vClients) { bank::updateRecordScreen(vClients, "Enter Account Number: ", "Client"); }
 
-	if (indexOfClient != -1) {
-		updateClientData(vClients[indexOfClient]);
-	} else {
-		cout << "Client Not Found!\n";
-	}
+void updateUserScreen(vector<bank::stUser> &vUsers) { bank::updateRecordScreen(vUsers, "Enter User Name: ", "User"); }
 
-	system("pause");
-}
-
-void updateUserScreen(vector<stUser> &vUsers) {
-	int indexOfUser = getIndexOfUserByUsername(vUsers, input::readString("Enter User Name: "));
-
-	if (indexOfUser != -1) {
-		updateUserData(vUsers[indexOfUser]);
-	} else {
-		cout << "User Not Found!\n";
-	}
-
-	system("pause");
-}
-
-void deleteClientScreen(vector<stClientData> &vClients) {
+void deleteClientScreen(vector<bank::stClientData> &vClients) {
 	if (input::readBool("Do you want to print data of this client before delete it? ")) {
 		printClientsInTableView(vClients);
-
-		system("pause");
 	}
 
 	output::resetScreen();
 
-	int indexOfClient = getIndexOfClientByAccountNumber(vClients, input::readString("Enter Account Number: "));
+	int indexOfClient = bank::getIndexOfClientByAccountNumber(vClients, input::readString("Enter Account Number: "));
 
 	if (indexOfClient != -1) {
 		deleteClient(vClients, vClients[indexOfClient].accountNumber);
 	} else {
 		cout << "Client Not Found!\n";
 	}
-
-	system("pause");
 }
 
-void deleteUserScreen(vector<stUser> &vUsers) {
+void deleteUserScreen(vector<bank::stUser> &vUsers) {
 	if (input::readBool("Do you want to print data of this user before delete it? ")) {
 		printUsersInTableView(vUsers);
 	}
 
 	output::resetScreen();
 
-	int indexOfUser = getIndexOfUserByUsername(vUsers, input::readString("Enter User Name: "));
+	int indexOfUser = bank::getIndexOfUserByUsername(vUsers, input::readString("Enter User Name: "));
 
 	if (indexOfUser != -1) {
 		deleteUser(vUsers, vUsers[indexOfUser].userName);
 	} else {
 		cout << "User Not Found!\n";
 	}
-
 }
 
-void findClientScreen(vector<stClientData> &vClients) {
-	printFindResult(vClients, getIndexOfClientByAccountNumber(vClients, input::readString("Enter Account Number: ")));
+void findClientScreen(vector<bank::stClientData> &vClients) { bank::findRecordScreen(vClients, "Enter Account Number: ", "Client"); }
 
-	system("pause");
-}
-
-void findUserScreen(vector<stUser> &vUsers) {
-	printFindResult(vUsers, getIndexOfUserByUsername(vUsers, input::readString("Enter User Name: ")));
-
-	system("pause");
-}
+void findUserScreen(vector<bank::stUser> &vUsers) { bank::findRecordScreen(vUsers, "Enter User Name: ", "User"); }
 
 void printTransactionsMenueScreen() {
 	cout << "=============================================\n";
@@ -523,25 +126,23 @@ void printTransactionsMenueScreen() {
 	cout << "=============================================\n";
 }
 
-void deposit(vector<stClientData> &vClients, int indexOfClient, double depositValue) { vClients[indexOfClient].accountBalance += depositValue; }
-
-void depositScreen(vector<stClientData> &vClients) {
-	int indexOfClient = getIndexOfClientByAccountNumber(vClients, input::readString("Enter Account Number: "));
+void depositScreen(vector<bank::stClientData> &vClients) {
+	int indexOfClient = bank::getIndexOfClientByAccountNumber(vClients, input::readString("Enter Account Number: "));
 
 	double depositValue = 0;
 	bool isFirstTime = 1;
 
 	if (indexOfClient != -1) {
 		if (isFirstTime) {
-			printClientDataVertical(vClients, indexOfClient);
+			bank::printClientDataVertical(vClients, indexOfClient);
 
 			isFirstTime = 0;
 		}
 
-		depositValue = input::readNumber<double>("Enter deposit value: ", 0.0, std::numeric_limits<double>::max());
+		depositValue = input::readNumber<double>("Enter deposit value: ", 0.0, numeric_limits<double>::max());
 
 		if (input::readBool("Are you sure you want to deposit this client [1] Yes [0] No: ")) {
-			deposit(vClients, indexOfClient, depositValue);
+			bank::deposit(vClients, indexOfClient, depositValue);
 			cout << "\nClient Deposit Successfully!\n";
 		} else {
 			cout << "Operation Cancelled!\n";
@@ -550,16 +151,10 @@ void depositScreen(vector<stClientData> &vClients) {
 	} else {
 		cout << "Client Not Found!\n";
 	}
-
-	system("pause");
 }
 
-void withdraw(vector<stClientData> &vClients, int indexOfClient, double withdrawValue) { vClients[indexOfClient].accountBalance -= withdrawValue; }
-
-bool isClientHasEnoughBalance(vector<stClientData> &vClients, int indexOfClient, double withdrawValue) { return vClients[indexOfClient].accountBalance >= withdrawValue; }
-
-void withdrawScreen(vector<stClientData> &vClients) {
-	int indexOfClient = getIndexOfClientByAccountNumber(vClients, input::readString("Enter Account Number: "));
+void withdrawScreen(vector<bank::stClientData> &vClients) {
+	int indexOfClient = bank::getIndexOfClientByAccountNumber(vClients, input::readString("Enter Account Number: "));
 
 	double withdrawValue = 0;
 	bool hasEnoughBalance = 0;
@@ -568,15 +163,15 @@ void withdrawScreen(vector<stClientData> &vClients) {
 	if (indexOfClient != -1) {
 		do {
 			if (isFirstTime) {
-				printClientDataVertical(vClients, indexOfClient);
+				bank::printClientDataVertical(vClients, indexOfClient);
 
 				isFirstTime = 0;
 			}
 
-			withdrawValue = input::readNumber<double>("Enter withdraw value: ", 0.0, std::numeric_limits<double>::max());
+			withdrawValue = input::readNumber<double>("Enter withdraw value: ", 0.0, numeric_limits<double>::max());
 
-			if ((hasEnoughBalance = isClientHasEnoughBalance(vClients, indexOfClient, withdrawValue))) {
-				withdraw(vClients, indexOfClient, withdrawValue);
+			if ((hasEnoughBalance = bank::isClientHasEnoughBalance(vClients, indexOfClient, withdrawValue))) {
+				bank::withdraw(vClients, indexOfClient, withdrawValue);
 				cout << "\nClient Withdraw Successfully!\n";
 				break;
 			} else {
@@ -586,21 +181,9 @@ void withdrawScreen(vector<stClientData> &vClients) {
 	} else {
 		cout << "Client Not Found!\n";
 	}
-
-	system("pause");
 }
 
-double getTotalBalances(const vector<stClientData> &vClients) {
-	double totalBalances = 0.0;
-
-	for (const auto &clientData : vClients) {
-		totalBalances += clientData.accountBalance;
-	}
-
-	return totalBalances;
-}
-
-void totalBalancesScreen(vector<stClientData> &vClients) {
+void totalBalancesScreen(vector<bank::stClientData> &vClients) {
 	string_view line = "-----------------------------------------------------------------";
 	cout << "\n" << setw(45) << "Number of Clients: " << vClients.size() << "\n";
 	cout << line << endl;
@@ -613,13 +196,11 @@ void totalBalancesScreen(vector<stClientData> &vClients) {
 	}
 	cout << line << "\n";
 	cout << "================================================================-\n";
-	cout << "Total Balances: " << getTotalBalances(vClients) << " $\n";
+	cout << "Total Balances: " << bank::getTotalBalances(vClients) << " $\n";
 	cout << "================================================================-\n";
-
-	system("pause");
 }
 
-bool handleTransactionsMenuChoice(enTransactions choise, vector<stClientData> &vClients) {
+bool handleTransactionsMenuChoice(enTransactions choise, vector<bank::stClientData> &vClients) {
 	output::resetScreen();
 	bool returnToMainMenu = false;
 
@@ -649,11 +230,11 @@ bool handleTransactionsMenuChoice(enTransactions choise, vector<stClientData> &v
 		break;
 	}
 
-	saveDataToFile(g_clientsFileName, vClients);
+	bank::saveDataToFile(g_clientsFileName, vClients);
 	return returnToMainMenu;
 }
 
-void transactionsScreen(vector<stClientData> &vClients) {
+void transactionsScreen(vector<bank::stClientData> &vClients) {
 	bool returnToMainMenu = false;
 
 	while (!returnToMainMenu) {
@@ -678,7 +259,7 @@ void printManageUsersMenuScreen() {
 	cout << "===========================================\n";
 }
 
-bool handleManageUsersMenuChoice(enManageUsers choise, vector<stUser> &vUsers) {
+bool handleManageUsersMenuChoice(enManageUsers choise, vector<bank::stUser> &vUsers) {
 	output::resetScreen();
 	bool returnToMainMenu = false;
 
@@ -711,7 +292,7 @@ bool handleManageUsersMenuChoice(enManageUsers choise, vector<stUser> &vUsers) {
 		break;
 	}
 
-	saveDataToFile(g_usersFileName, vUsers);
+	bank::saveDataToFile(g_usersFileName, vUsers);
 	return returnToMainMenu;
 }
 
@@ -720,14 +301,14 @@ void manageUsersScreen() {
 	do {
 		output::resetScreen();
 		printManageUsersMenuScreen();
-		vector<stUser> vUsers = loadUsersDataFromFile(g_usersFileName);
+		vector<bank::stUser> vUsers = bank::loadUsersDataFromFile(g_usersFileName);
 
-	 enManageUsers	choice = static_cast<enManageUsers>(input::readNumber<int>("Enter your choice: ", 1, 6));
+		enManageUsers choice = static_cast<enManageUsers>(input::readNumber<int>("Enter your choice: ", 1, 6));
 		returnToMainMenu = handleManageUsersMenuChoice(choice, vUsers);
 	} while (!returnToMainMenu);
 }
 
-bool handleMainMenuChoice(enMainMinuChoice choise, vector<stClientData> &vClients) {
+bool handleMainMenuChoice(enMainMinuChoice choise, vector<bank::stClientData> &vClients) {
 	bool shouldLogOut = false;
 
 	switch (choise) {
@@ -776,40 +357,50 @@ bool handleMainMenuChoice(enMainMinuChoice choise, vector<stClientData> &vClient
 		break;
 
 	default:
-		system("pause");
+
 		break;
 	}
 
-	saveDataToFile(g_clientsFileName, vClients);
+	bank::saveDataToFile(g_clientsFileName, vClients);
 	return shouldLogOut;
 }
 
-void mainApp() {
-	vector<stClientData> vClients;
+bool hasPermission(short permission, short permissionMask) { return (permission & permissionMask) != 0; }
+
+void mainApp(short permission) {
+	vector<bank::stClientData> vClients;
 	bool shouldLogOut = false;
 
 	while (!shouldLogOut) {
 		output::resetScreen();
-		vClients = loadClientDataFromFile(g_clientsFileName);
+		vClients = bank::loadClientDataFromFile(g_clientsFileName);
 
 		printMainMenueScreen();
 
 		enMainMinuChoice choise = static_cast<enMainMinuChoice>(input::readNumber<int>("Enter your choise: ", 1, 8));
 
+		if (choise != enMainMinuChoice::eLogOut && !hasPermission(permission, static_cast<short>(1 << (choise - 1)))) {
+			cout << "You don't have permission to perform this action.\n";
+			output::resetScreen(true, true, 2);
+			continue;
+		}
+
 		shouldLogOut = handleMainMenuChoice(choise, vClients);
 	}
 }
 
-void printLoginScreenLogo() {
-	cout << "====================================\n";
-	cout << "           LogIn Screen\n";
-	cout << "====================================\n";
-}
+bool loginLogic(const vector<bank::stUser> &vUsers) {
+	bool isPasswordCorrect = false;
+	bool isFirstLoginAttempt = true;
 
-bool loginLogic(const vector<stUser> &vUsers) {
-	do {
+	while (!isPasswordCorrect) {
 		output::resetScreen();
-		printLoginScreenLogo();
+		bank::printLoginScreenLogo();
+
+		if (!isFirstLoginAttempt) {
+			cout << "Incorrect Account Number or Pin Code. Please try again.\n";
+		}
+		isFirstLoginAttempt = false;
 
 		string userName = input::readString("Enter User Name: ");
 		string password = input::readString("Enter Password: ");
@@ -819,18 +410,22 @@ bool loginLogic(const vector<stUser> &vUsers) {
 				cout << "Login Successful!\n";
 				this_thread::sleep_for(chrono::seconds(1));
 
-				mainApp();
+				int indexOfUser = bank::getIndexOfUserByUsername(vUsers, userName);
 
+				mainApp(vUsers[indexOfUser].permission);
+
+				isPasswordCorrect = true;
 				return false;
 			}
 		}
-	} while (input::readBool("Login Failed!\n Do you want to try again? [1] Yes [0] No: "));
+	}
+	while (input::readBool("Login Failed!\n Do you want to try again? [1] Yes [0] No: "));
 
 	return false;
 }
 
 void logIn() {
-	vector<stUser> vUsers = loadUsersDataFromFile(g_usersFileName);
+	vector<bank::stUser> vUsers = bank::loadUsersDataFromFile(g_usersFileName);
 
 	do {
 		output::resetScreen();

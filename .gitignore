@@ -13,6 +13,9 @@ core
 core.[0-9]*
 diff_output.txt
 
+!libraries/cpp_libraries/core/
+!libraries/cpp_libraries/core/**
+
 # C++ / Build Output Directories & Files
 learn/
 build/

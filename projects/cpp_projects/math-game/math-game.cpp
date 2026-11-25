@@ -1,4 +1,4 @@
-#include "../../../libraries/cpp_libraries/input.h"
+#include "../../../libraries/cpp_libraries/io/input.h"
 #include "../../../libraries/cpp_libraries/process.h"
 
 #include <cstdlib>

@@ -1,5 +1,5 @@
-#include "../../../libraries/cpp_libraries/input.h"
-#include "../../../libraries/cpp_libraries/output.h"
+#include "../../../libraries/cpp_libraries/io/input.h"
+#include "../../../libraries/cpp_libraries/io/output.h"
 #include "../../../libraries/cpp_libraries/process.h"
 
 #include <cstddef>
