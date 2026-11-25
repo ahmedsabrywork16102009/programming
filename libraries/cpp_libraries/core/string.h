@@ -342,7 +342,7 @@ namespace process {
 		if (number == 0) return "";
 
 		if (number < 0) {
-			return (language == enumeration::EN ? "minus " : "سالب ") + numberToText(-number, language);
+			return "minus " + numberToText(-number, language);
 		}
 
 		switch (language) {
@@ -370,27 +370,7 @@ namespace process {
 			break;
 		}
 		case enumeration::AR: {
-			if (number >= 1 && number <= 19) {
-				static const std::string arr[] = {"", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة", "عشرة", "أحد عشر", "اثنا عشر", "ثلاثة عشر", "أربعة عشر", "خمسة عشر", "ستة عشر", "سبعة عشر", "ثمانية عشر", "تسعة عشر"};
-				return arr[number];
-			}
-			if (number >= 20 && number <= 99) {
-				static const std::string arr[] = {"", "", "عشرون", "ثلاثون", "أربعون", "خمسون", "ستون", "سبعون", "ثمانون", "تسعون"};
-				std::string suffix = numberToText(number % 10, enumeration::AR);
-				return arr[number / 10] + (suffix.empty() ? "" : " " + suffix);
-			}
-			struct Scale {
-				long long limit;
-				const char *name;
-			};
-			static const Scale scales[] = {{1000000000LL, " مليار"}, {1000000LL, " مليون"}, {1000LL, " الف"}, {100LL, " مائة"}};
-			for (const auto &scale : scales) {
-				if (number >= scale.limit) {
-					std::string suffix = numberToText(number % scale.limit, enumeration::AR);
-					return numberToText(number / scale.limit, enumeration::AR) + scale.name + (suffix.empty() ? "" : " " + suffix);
-				}
-			}
-			break;
+			return numberToText(number, enumeration::EN);
 		}
 		}
 		return "";

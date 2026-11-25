@@ -13,7 +13,7 @@ git branch -D main
 git branch -m main
 git push -f origin main
 
-معرفة التغيير اللي حصل في الملفات
+Check the files that changed
 git add .
 git --no-pager diff HEAD > diff_output.txt
 

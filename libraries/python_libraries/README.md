@@ -1,4 +1,4 @@
-# 🐍 Ahmed Sabry (AS) Python Libraries
+# Ahmed Sabry (AS) Python Libraries
 
-مكتبات بايثون المشتركة لمشاريع الـ Python Workspace.
+Shared Python libraries for the Python workspace projects.
 

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ضاغط الكود</title>
+<title>Code Compressor</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -85,32 +85,32 @@
 </head>
 <body>
 
-<h1>🗜️ ضاغط الكود</h1>
+<h1>🗜️ Code Compressor</h1>
 
 <div class="container">
 
-  <!-- ✅ Checkbox التحكم في الوضع -->
+  <!-- ✅ Mode checkbox -->
   <div class="toggle-box" onclick="toggleMode(event)">
     <input type="checkbox" id="pasteMode" checked>
-    <label for="pasteMode">📥 وضع اللصق التلقائي</label>
-    <span class="desc" id="modeDesc">(مفعّل — اضغط في المكان هيتلصق)</span>
+    <label for="pasteMode">📥 Automatic Paste Mode</label>
+    <span class="desc" id="modeDesc">(Enabled — click to paste)</span>
   </div>
 
   <div>
-    <div class="label">📥 مكان الكود:</div>
-    <textarea id="input" placeholder="اضغط هنا..."></textarea>
-    <div class="hint" id="inputHint">💡 اضغط في المكان = يتلصق تلقائياً</div>
+    <div class="label">📥 Code Input:</div>
+    <textarea id="input" placeholder="Click here..."></textarea>
+    <div class="hint" id="inputHint">💡 Click here for automatic paste</div>
   </div>
 
   <div>
-    <div class="label">📤 الناتج (اضغط عليه هيتنسخ تلقائياً):</div>
-    <textarea id="output" readonly placeholder="هيظهر هنا تلقائياً..."></textarea>
-    <div class="hint">💡 اضغط على الناتج عشان يتنسخ</div>
+    <div class="label">📤 Output (click it to copy automatically):</div>
+    <textarea id="output" readonly placeholder="Output appears here..."></textarea>
+    <div class="hint">💡 Click the output to copy it</div>
   </div>
 
   <div class="buttons">
-    <button id="saveBtn">💾 احفظ .txt</button>
-    <button id="clearBtn">🗑️ امسح</button>
+    <button id="saveBtn">💾 Save .txt</button>
+    <button id="clearBtn">🗑️ Clear</button>
   </div>
 
   <div id="status"></div>
@@ -139,20 +139,20 @@
       .trim();
   }
 
-  // تحديث النص حسب الوضع
+  // Update text according to the selected mode
   function updateModeUI() {
     if (pasteMode.checked) {
-      modeDesc.textContent = '(مفعّل — اضغط في المكان هيتلصق)';
-      inputHint.textContent = '💡 اضغط في المكان = يتلصق تلقائياً';
+      modeDesc.textContent = '(Enabled — click to paste)';
+      inputHint.textContent = '💡 Click here for automatic paste';
     } else {
-      modeDesc.textContent = '(متوقف — اكتب بنفسك أو Ctrl+V)';
-      inputHint.textContent = '💡 وضع الكتابة — اكتب بنفسك أو استخدم Ctrl+V';
+      modeDesc.textContent = '(Disabled — type or press Ctrl+V)';
+      inputHint.textContent = '💡 Typing mode — type or press Ctrl+V';
     }
   }
   pasteMode.addEventListener('change', updateModeUI);
   updateModeUI();
 
-  // منع الـ label من تفعيل/تعطيل الـ checkbox مرتين
+  // Prevent the label from toggling the checkbox twice
   function toggleMode(e) {
     if (e.target.tagName !== 'INPUT') {
       pasteMode.checked = !pasteMode.checked;
@@ -160,33 +160,33 @@
     }
   }
 
-  // ✅ اللصق التلقائي (لو الوضع مفعّل)
+  // ✅ Automatic paste when the mode is enabled
   input.addEventListener('click', async () => {
-    if (!pasteMode.checked) return; // لو وضع الكتابة، مفيش لصق
+    if (!pasteMode.checked) return; // No automatic paste in typing mode
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
         input.value = text;
         output.value = compressCode(text);
-        showStatus('📥 اتلصق واتضغط!');
+        showStatus('📥 Pasted and compressed!');
       }
     } catch {
-      showStatus('⚠️ المتصفح رفض اللصق. استخدم Ctrl+V', '#f9e2af');
+      showStatus('⚠️ The browser denied paste access. Use Ctrl+V.', '#f9e2af');
     }
   });
 
-  // ✅ لو لصق بـ Ctrl+V في أي وضع → يتضغط
+  // ✅ Paste with Ctrl+V in either mode
   input.addEventListener('paste', () => {
     setTimeout(() => {
       const code = input.value;
       if (code.trim()) {
         output.value = compressCode(code);
-        showStatus('✅ اتضغط!');
+        showStatus('✅ Compressed!');
       }
     }, 10);
   });
 
-  // ✅ كتابة حية (لو وضع الكتابة)
+  // ✅ Live typing in typing mode
   input.addEventListener('input', () => {
     const code = input.value;
     if (code.trim()) {
@@ -196,23 +196,23 @@
     }
   });
 
-  // ✅ النسخ التلقائي: لما تضغط على الناتج
+  // ✅ Automatic copy when output is clicked
   output.addEventListener('click', async () => {
     if (!output.value) return;
     try {
       await navigator.clipboard.writeText(output.value);
-      showStatus('📋 اتنسخ!');
+      showStatus('📋 Copied!');
     } catch {
       output.select();
       document.execCommand('copy');
-      showStatus('📋 اتنسخ!');
+      showStatus('📋 Copied!');
     }
   });
 
-  // حفظ كملف txt
+  // Save as a text file
   document.getElementById('saveBtn').onclick = () => {
     if (!output.value) {
-      showStatus('⚠️ مفيش ناتج!', '#f9e2af');
+      showStatus('⚠️ No output!', '#f9e2af');
       return;
     }
     const blob = new Blob([output.value], { type: 'text/plain' });
@@ -222,14 +222,14 @@
     a.download = 'code.txt';
     a.click();
     URL.revokeObjectURL(url);
-    showStatus('💾 اتحفظ!');
+    showStatus('💾 Saved!');
   };
 
-  // مسح
+  // Clear
   document.getElementById('clearBtn').onclick = () => {
     input.value = '';
     output.value = '';
-    showStatus('🗑️ اتمسح');
+    showStatus('🗑️ Cleared');
   };
 </script>
 

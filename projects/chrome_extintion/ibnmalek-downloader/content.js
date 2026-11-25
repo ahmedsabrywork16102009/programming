@@ -51,11 +51,11 @@
           '.text-primary.text-bold, .text-caption.text-bold, h1, h2, h3'
         ) || a;
 
-      const title = clean(titleNode.textContent) || `درس ${id}`;
+      const title = clean(titleNode.textContent) || `Lesson ${id}`;
       const numberMatch = title.match(/^\s*(\d{1,3})\s+/);
 
       const teacherText = clean(card.textContent).match(
-        /(?:شرح الشيخ|المحاضر)\s*[:：]?\s*([^\n]{2,80})/
+        /(?:Instructor|Teacher)\s*[:：]?\s*([^\n]{2,80})/
       );
 
       const thumb = card.querySelector(
@@ -107,9 +107,9 @@
         .replace(/fiber_manual_record|file_download|description/g, '')
         .trim();
 
-    // فتح تبويب المرفقات حتى تظهر عناصره قبل جمع الروابط.
+    // Open the attachments tab before collecting links.
     const attachmentTab = [...document.querySelectorAll('[role="listitem"]')]
-      .find(el => /^مرفقات$/.test(clean(el.innerText)));
+      .find(el => /^Attachments$/.test(clean(el.innerText)));
 
     if (attachmentTab && !attachmentTab.classList.contains('q-item--active')) {
       attachmentTab.click();
@@ -141,14 +141,14 @@
       );
 
       const label = rowText || linkText || decodeURIComponent(
-        new URL(href).pathname.split('/').pop() || 'ملف'
+        new URL(href).pathname.split('/').pop() || 'File'
       );
 
       const lower = `${href} ${label}`.toLowerCase();
 
       const looksFile =
         /\.(pdf|mp3|m4a|aac|wav|ogg|mp4|m4v|webm|docx?|xlsx?|pptx?|zip|rar|png|jpe?g)(?:$|[?#])/i.test(href) ||
-        /الدرس صوتي|مشجرات الدرس|تفريغ الدرس|تحميل|download|audio|pdf|مرفق|ملف/.test(lower);
+        /lesson audio|lesson summary|lesson transcript|download|audio|pdf|attachment|file/.test(lower);
 
       if (!looksFile) continue;
 
@@ -167,7 +167,7 @@
         'h1,h2,h3,h4,.text-subtitle1,.text-h6'
       )
     ].find(el =>
-      /التمارين|الأسئلة|التدريبات/i.test(clean(el.textContent))
+      /Exercises|Questions|Practice/i.test(clean(el.textContent))
     );
 
     let exercisesHtml = '';
@@ -212,13 +212,13 @@
     const s = `${url} ${label}`.toLowerCase();
 
     if (
-      /\.(mp3|m4a|aac|wav|ogg)(?:$|[?#])|صوت|audio/.test(s)
+      /\.(mp3|m4a|aac|wav|ogg)(?:$|[?#])|audio/.test(s)
     ) {
       return 'audio';
     }
 
     if (
-      /\.pdf(?:$|[?#])|مشجر|تفريغ|pdf/.test(s)
+      /\.pdf(?:$|[?#])|summary|transcript|pdf/.test(s)
     ) {
       return 'document';
     }

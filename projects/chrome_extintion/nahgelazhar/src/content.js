@@ -4,17 +4,17 @@
   const SETTINGS_KEY = 'nahj_settings', TREES_KEY = 'nahj_trees', OPEN_KEY = 'nahj_open',
         LAST_KEY = 'nahj_last_lesson', ICON_KEY = 'nahj_icons';
   const COURSE_ID = '4c086b90-30b2-44cc-a5f9-d2f74a4c3448';
-  const COURSE_KEYS = ['مواد عربية', 'الثالث الثانوي'];
+  const COURSE_KEYS = ['Arabic subjects', 'Third Secondary'];
 
   const norm = s => (s || '').replace(/\s+/g, ' ').trim();
-  const nrm = s => norm(s).replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه');
-  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const nrm = s => norm(s).toLowerCase();
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&', '<': '<', '>': '>', '"': '"' }[c]));
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (_) { return d; } };
   const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { } };
   const hookOn = () => document.documentElement.getAttribute('data-nahj-hook') === '1';
 
-  // ===== الإعدادات =====
+  // ===== Settings =====
   const settings = {
     newView: true, showLit: true, statsLit: true, sortLessons: true, statsHidden: false, showEmpty: false, folded: false,
     hiddenSubs: [], hiddenTypes: [], hideDone: false,
@@ -45,7 +45,7 @@
     try { chrome.storage.local.get(SETTINGS_KEY, r => fin(r && r[SETTINGS_KEY])); } catch (_) { fin(null); }
   }
 
-  // ===== الحالة =====
+  // ===== State =====
   const trees = read(TREES_KEY, {});
   const icons = read(ICON_KEY, {});
   const openKeys = new Set(read(OPEN_KEY, []));
@@ -53,7 +53,7 @@
   let model = null, modelId = null, edit = null, query = '', lastLesson = read(LAST_KEY, null);
   let ready = false, busy = false, active = false, mountedHost = null, userMoved = false, timer = null, reloadArmed = false;
 
-  // واجهة للملفات التانية (الإحصائيات في المرحلة 3)
+  // Interface for other files
   const api = window.__nahj = {
     version: 2, listeners: [], settings,
     saveSettings: () => saveSettings(),
@@ -65,8 +65,8 @@
   };
   function emit() { api.listeners.forEach(f => { try { f(); } catch (e) { console.error('[Nahj]', e); } }); }
 
-  // ===== بيانات الكورس (من رد الموقع) =====
-  const TN = { Video: 'فيديو', File: 'ملف', Quiz: 'اختبار', Assignment: 'علامة' };
+  // ===== Course data from the website response =====
+  const TN = { Video: 'Video', File: 'File', Quiz: 'Quiz', Assignment: 'Assignment' };
   const doneOf = l => l.type === 'Video' ? !!l.isCompleted : l.type === 'File' ? !!l.isFileOpened
     : l.type === 'Quiz' ? !!l.isQuizSubmitted : l.type === 'Assignment' ? !!l.isAssignmentSubmitted : false;
   const compact = d => ({
@@ -101,12 +101,12 @@
     else if (e.data.type === 'refetch-failed') location.reload();
   });
 
-  // ===== المواد والتصنيف (الواضح بس، والباقي بتصنفه إنت) =====
+  // ===== Subjects and classification =====
   const SUBJECTS = [
-    ['nahw', 'نحو', ['نحو']], ['adab', 'أدب', ['ادب']], ['sarf', 'صرف', ['صرف']],
-    ['nosos', 'نصوص', ['نصوص']], ['balagha', 'بلاغة', ['بلاغه']]
+    ['nahw', 'Grammar', ['grammar']], ['adab', 'Literature', ['literature']], ['sarf', 'Morphology', ['morphology']],
+    ['nosos', 'Texts', ['texts']], ['balagha', 'Rhetoric', ['rhetoric']]
   ];
-  const isLit = t => nrm(t).includes('ادبي');
+  const isLit = t => nrm(t).toLowerCase().includes('literature');
   const findSubs = txt => { const n = nrm(txt); return SUBJECTS.filter(x => x[2].some(k => n.includes(k))).map(x => x[0]); };
   const allSubjects = () => SUBJECTS.map(x => ({ id: x[0], name: x[1] }))
     .concat(Object.entries(settings.customSubjects).map(([id, name]) => ({ id, name })));
@@ -114,38 +114,38 @@
 
   function classify(u, n, t) {
     const a = [];
-    if (t === 'فيديو') a.push('video', n.includes('حل') || n.includes('واجب') ? 'hw' : 'explain');
-    else if (t === 'ملف') { if (n.includes('سبورة')) a.push('board'); else if (n.includes('واجب') || n.includes('حل')) a.push('hw'); }
-    else if (t === 'اختبار') a.push(u.includes('شامل') || n.includes('شامل') ? 'comp' : n.includes('قبل') ? 'pre' : n.includes('بعد') ? 'post' : 'other');
+    if (t === 'Video') a.push('video', n.includes('solution') || n.includes('homework') ? 'hw' : 'explain');
+    else if (t === 'File') { if (n.includes('board')) a.push('board'); else if (n.includes('homework') || n.includes('solution')) a.push('hw'); }
+    else if (t === 'Quiz') a.push(u.includes('comprehensive') || n.includes('comprehensive') ? 'comp' : n.includes('before') ? 'pre' : n.includes('after') ? 'post' : 'other');
     return a;
   }
   function rank(u, n, t) {
-    if (t === 'علامة') return 99;
-    if (t === 'اختبار') return u.includes('شامل') || n.includes('شامل') ? 8 : n.includes('قبل') ? 0 : 7;
-    if (t === 'فيديو') return n.includes('حل') || n.includes('واجب') ? 5 : 1;
-    if (t === 'ملف') return n.includes('سبورة') ? 2 : n.includes('واجب') || n.includes('حل') ? 6 : 3;
+    if (t === 'Assignment') return 99;
+    if (t === 'Quiz') return u.includes('comprehensive') || n.includes('comprehensive') ? 8 : n.includes('before') ? 0 : 7;
+    if (t === 'Video') return n.includes('solution') || n.includes('homework') ? 5 : 1;
+    if (t === 'File') return n.includes('board') ? 2 : n.includes('homework') || n.includes('solution') ? 6 : 3;
     return 4;
   }
   const sortLessons = arr => arr.slice().sort((a, b) =>
     (settings.sortLessons ? rank(a.uname, a.name, a.tn) - rank(b.uname, b.name, b.tn) : 0) || a.ord - b.ord);
 
-  const ORD = ['', 'الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
-  const TENS = { 20: 'العشرون', 30: 'الثلاثون', 40: 'الأربعون', 50: 'الخمسون' };
+  const ORD = ['', 'First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
+  const TENS = { 20: 'Twentieth', 30: 'Thirtieth', 40: 'Fortieth', 50: 'Fiftieth' };
   function ordinalAr(n) {
     if (n <= 10) return ORD[n];
-    if (n === 11) return 'الحادية عشرة';
-    if (n === 12) return 'الثانية عشرة';
-    if (n < 20) return ORD[n - 10] + ' عشرة';
+    if (n === 11) return 'Eleventh';
+    if (n === 12) return 'Twelfth';
+    if (n < 20) return ORD[n - 10] + 'th';
     const t = Math.floor(n / 10) * 10, o = n % 10;
-    if (!o) return TENS[t] || ('رقم ' + n);
-    return (o === 1 ? 'الحادية' : ORD[o]) + ' و' + (TENS[t] || t);
+    if (!o) return TENS[t] || ('Number ' + n);
+    return ORD[o] + ' and ' + (TENS[t] || t);
   }
-  const key4 = s => nrm(s).replace(/ى/g, 'ي').replace(/\s+/g, '');
+  const key4 = s => nrm(s).replace(/\s+/g, '');
   const sameOrd = (a, b) => key4(a) === key4(b);
-  const lectureTeacher = name => { const m = norm(name).match(/المحاضرة\s+(.+?)\s*(?:[-–—]|$)/); return m ? m[1].trim() : null; };
-  const isMarker = l => l.type === 'Assignment' && /^انتهت محتويات/.test(l.name);
-  const markerTeacher = name => norm(name).replace(/[^\u0600-\u06FF\s]/g, '').replace(/^\s*انتهت محتويات\s*/, '')
-    .replace(/^المحاضرة\s*/, '').replace(/\s*في مادة.*$/, '').trim() || null;
+  const lectureTeacher = name => { const m = norm(name).match(/Lecture\s+(.+?)\s*(?:[-–—]|$)/i); return m ? m[1].trim() : null; };
+  const isMarker = l => l.type === 'Assignment' && /^End of content/i.test(l.name);
+  const markerTeacher = name => norm(name).replace(/^[\s]*End of content[\s]*/i, '')
+    .replace(/^Lecture[\s]*/i, '').replace(/\s*in subject.*$/i, '').trim() || null;
 
   function buildModel(tree) {
     const ginfo = {}, units = [];
@@ -212,7 +212,7 @@
         return;
       }
       const gi = ginfo[o.gbase] || {};
-      const title = (gi.uname || o.uname) + (gi.marker ? (gi.teacher ? ' · المحاضرة ' + gi.teacher : ' · بعد آخر علامة') : '');
+      const title = (gi.uname || o.uname) + (gi.marker ? (gi.teacher ? ' · Lecture ' + gi.teacher : ' · After the last marker') : '');
       push(uncl, o.gbase, { base: o.gbase, title, order: gi.order || o.ord }, o);
     });
 
@@ -227,7 +227,7 @@
         else if (b.kind === 'lecture') {
           n++; b.num = n;
           const o = ordinalAr(n);
-          b.label = o + (b.teacher && !sameOrd(o, b.teacher) ? ' · عند المستر: ' + b.teacher : '');
+          b.label = o + (b.teacher && !sameOrd(o, b.teacher) ? ' · Instructor: ' + b.teacher : '');
         } else b.label = b.uname;
       });
       subjects.push({ id: sid, name: subName(sid), blocks: arr, ord: arr[0].order });
@@ -262,7 +262,7 @@
     });
   }
 
-  // ===== العرض =====
+  // ===== Display =====
   const CHEV = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
   const TICK = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
   const chev = open => `<span class="text-gray-500" style="display:flex;transition:transform .2s;${open ? 'transform:rotate(180deg)' : ''}">${CHEV}</span>`;
@@ -295,18 +295,18 @@
     const opts = (sub ? sub.blocks : []).map(b => ({ base: b.base, label: b.label }));
     if (ownBase && !opts.some(o => o.base === ownBase)) {
       const gi = model.ginfo[ownBase];
-      opts.push({ base: ownBase, label: 'وحدتها الأصلية: ' + (gi ? (gi.teacher ? 'المحاضرة ' + gi.teacher : gi.uname) : ownBase) });
+      opts.push({ base: ownBase, label: 'Original unit: ' + (gi ? (gi.teacher ? 'Lecture ' + gi.teacher : gi.uname) : ownBase) });
     }
     return opts;
   }
   function editorHtml(ownBase) {
     const chip = (attr, val, label, on) => `<button type="button" ${attr}="${esc(val)}" class="${on ? 'bg-green-700 text-white' : 'border border-green-200/70 text-green-800'}" style="font-size:12px;padding:3px 11px;border-radius:999px;cursor:pointer;${on ? 'border:0;' : 'background:transparent;'}">${esc(label)}</button>`;
-    let h = `<div class="bg-green-50" style="margin:6px 16px 10px;padding:10px 12px;border-radius:12px"><div class="text-gray-500" style="font-size:12px;margin-bottom:6px">١) اختار المادة</div><div style="display:flex;flex-wrap:wrap;gap:6px">${allSubjects().map(s => chip('data-ps', s.id, s.name, edit.sid === s.id)).join('')}${chip('data-ps', '__ns', '＋ مادة جديدة', false)}</div>`;
+    let h = `<div class="bg-green-50" style="margin:6px 16px 10px;padding:10px 12px;border-radius:12px"><div class="text-gray-500" style="font-size:12px;margin-bottom:6px">1) Choose a subject</div><div style="display:flex;flex-wrap:wrap;gap:6px">${allSubjects().map(s => chip('data-ps', s.id, s.name, edit.sid === s.id)).join('')}${chip('data-ps', '__ns', '＋ New subject', false)}</div>`;
     if (edit.sid) {
       const o = lecOptions(edit.sid, ownBase);
-      h += `<div class="text-gray-500" style="font-size:12px;margin:10px 0 6px">٢) اختار المحاضرة</div><div style="display:flex;flex-wrap:wrap;gap:6px">${o.map(x => chip('data-pk', x.base, x.label, false)).join('')}${chip('data-pk', '__nl', '＋ محاضرة جديدة', false)}</div>`;
+      h += `<div class="text-gray-500" style="font-size:12px;margin:10px 0 6px">2) Choose a lecture</div><div style="display:flex;flex-wrap:wrap;gap:6px">${o.map(x => chip('data-pk', x.base, x.label, false)).join('')}${chip('data-pk', '__nl', '＋ New lecture', false)}</div>`;
     }
-    h += `<div style="display:flex;gap:8px;margin-top:10px"><button type="button" data-auto class="border border-green-200/70 text-green-800" style="font-size:12px;padding:3px 11px;border-radius:999px;cursor:pointer;background:transparent">رجّعها تلقائي</button><button type="button" data-cancel class="border border-green-200/70 text-green-800" style="font-size:12px;padding:3px 11px;border-radius:999px;cursor:pointer;background:transparent">إغلاق</button></div></div>`;
+    h += `<div style="display:flex;gap:8px;margin-top:10px"><button type="button" data-auto class="border border-green-200/70 text-green-800" style="font-size:12px;padding:3px 11px;border-radius:999px;cursor:pointer;background:transparent">Restore automatically</button><button type="button" data-cancel class="border border-green-200/70 text-green-800" style="font-size:12px;padding:3px 11px;border-radius:999px;cursor:pointer;background:transparent">Close</button></div></div>`;
     return h;
   }
   function lessonRow(l, noPill) {
@@ -314,12 +314,12 @@
     const ico = icons[l.type] ? `<img src="${esc(icons[l.type])}" alt="" style="width:26px;height:26px;object-fit:contain">`
       : `<span style="font-size:20px">${{ Video: '🎬', File: '📄', Quiz: '📝', Assignment: '🏁' }[l.type] || '📌'}</span>`;
     const badge = l.done ? `<span class="bg-green-700 text-white" style="position:absolute;bottom:-4px;left:-4px;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center">${TICK}</span>` : '';
-    const label = l.sid ? subName(l.sid) : 'غير مصنّف';
-    const pill = noPill ? '' : `<button type="button" data-edit="l:${l.id}" title="تصنيف" class="border border-green-200/70 ${l.sid ? 'text-green-700' : 'text-gold-700'}" style="flex-shrink:0;font-size:11px;padding:2px 9px;border-radius:999px;cursor:pointer;background:transparent;${l.manual ? 'font-weight:700;' : ''}">${esc(label)}${l.manual ? ' ✎' : ''}</button>`;
+    const label = l.sid ? subName(l.sid) : 'Unclassified';
+    const pill = noPill ? '' : `<button type="button" data-edit="l:${l.id}" title="Classification" class="border border-green-200/70 ${l.sid ? 'text-green-700' : 'text-gold-700'}" style="flex-shrink:0;font-size:11px;padding:2px 9px;border-radius:999px;cursor:pointer;background:transparent;${l.manual ? 'font-weight:700;' : ''}">${esc(label)}${l.manual ? ' ✎' : ''}</button>`;
     const ed = !noPill && edit && edit.key === 'l:' + l.id ? editorHtml(l.gbase) : '';
     return `<div class="border-b border-green-50" style="${hl}"><div data-open="${l.id}" class="hover:bg-green-50/40" style="display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer">` +
       `<div class="bg-green-50${l.done ? ' ring-2 ring-green-600/30' : ''}" style="position:relative;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ico}${badge}</div>` +
-      `<div style="flex:1;min-width:0"><div class="text-green-900" style="font-size:14px;font-weight:700;word-break:break-word">${esc(l.name)}</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap"><span class="border border-green-100 bg-green-50 text-green-800" style="font-size:11px;padding:1px 8px;border-radius:999px">${esc(l.tn)}</span>${l.done ? '<span class="text-green-700" style="font-size:11px;font-weight:700">مكتمل</span>' : ''}</div></div>${pill}</div>${ed}</div>`;
+      `<div style="flex:1;min-width:0"><div class="text-green-900" style="font-size:14px;font-weight:700;word-break:break-word">${esc(l.name)}</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap"><span class="border border-green-100 bg-green-50 text-green-800" style="font-size:11px;padding:1px 8px;border-radius:999px">${esc(l.tn)}</span>${l.done ? '<span class="text-green-700" style="font-size:11px;font-weight:700">Completed</span>' : ''}</div></div>${pill}</div>${ed}</div>`;
   }
   function sectionShell(inner, cls) {
     return `<div class="bg-white rounded-2xl border ${cls || 'border-green-200/70'} shadow-md shadow-green-900/10 overflow-hidden" data-nahj>${inner}</div>`;
@@ -334,7 +334,7 @@
     const badge = `<span class="bg-white border border-green-200/70 text-green-800" style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${b.num || '📝'}</span>`;
     let h = `<div data-tg data-k="${esc(k)}" data-p="${esc('s:' + s.id)}" class="border-t border-green-100" style="display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;background:rgba(240,253,244,.5)">${badge}` +
       `<span class="text-green-900" style="flex:1;min-width:0;font-size:14px;font-weight:700">${esc(b.label)}</span>` +
-      `<span class="${c.d === c.t ? 'text-green-700' : 'text-gray-600'}" style="font-size:12px;white-space:nowrap">${c.d === c.t ? '✅ ' : ''}${c.d}/${c.t} دروس</span>${chev(open)}</div>`;
+      `<span class="${c.d === c.t ? 'text-green-700' : 'text-gray-600'}" style="font-size:12px;white-space:nowrap">${c.d === c.t ? '✅ ' : ''}${c.d}/${c.t} lessons</span>${chev(open)}</div>`;
     if (open) h += ls.map(l => lessonRow(l)).join('');
     return h;
   }
@@ -349,8 +349,8 @@
     const nx = all.find(l => !l.done && l.type !== 'Assignment');
     let h = `<div data-tg data-k="${esc(k)}" data-p="root" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer">` +
       `<div class="bg-green-700 text-white" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0">${esc(s.name.slice(0, 1))}</div>` +
-      `<div style="flex:1;min-width:0"><div class="text-green-800 font-thmanyah" style="font-size:17px;font-weight:700">${esc(s.name)}</div><div class="text-gray-500" style="font-size:12px;margin-bottom:6px">${c.d} / ${c.t} درس · ${lec} محاضرة</div>${bar(c.p)}</div>${chev(open)}</div>`;
-    if (nx && !query) h += `<div data-open="${nx.id}" class="text-gray-600 hover:bg-green-50/40" style="display:flex;align-items:center;gap:6px;padding:0 16px 10px;font-size:12px;cursor:pointer;word-break:break-word">▶️ الدرس الجاي: <b class="text-green-800">${esc(nx.name)}</b></div>`;
+      `<div style="flex:1;min-width:0"><div class="text-green-800 font-thmanyah" style="font-size:17px;font-weight:700">${esc(s.name)}</div><div class="text-gray-500" style="font-size:12px;margin-bottom:6px">${c.d} / ${c.t} lessons · ${lec} lectures</div>${bar(c.p)}</div>${chev(open)}</div>`;
+    if (nx && !query) h += `<div data-open="${nx.id}" class="text-gray-600 hover:bg-green-50/40" style="display:flex;align-items:center;gap:6px;padding:0 16px 10px;font-size:12px;cursor:pointer;word-break:break-word">▶️ Next lesson: <b class="text-green-800">${esc(nx.name)}</b></div>`;
     if (open) h += body;
     return sectionShell(h);
   }
@@ -362,7 +362,7 @@
     parentOf.set(k, 'uc');
     let h = `<div data-tg data-k="${esc(k)}" data-p="uc" class="border-t border-green-100" style="display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;background:rgba(254,252,232,.5)">` +
       `<span class="text-green-900" style="flex:1;min-width:0;font-size:13px;font-weight:700">${esc(g.title)}</span><span class="text-gray-600" style="font-size:12px">${ls.length}</span>` +
-      `<button type="button" data-edit="g:${esc(g.base)}" class="border border-green-200/70 text-green-800" style="font-size:11px;padding:2px 9px;border-radius:999px;cursor:pointer;background:transparent">تصنيف الكل</button>${chev(open)}</div>`;
+      `<button type="button" data-edit="g:${esc(g.base)}" class="border border-green-200/70 text-green-800" style="font-size:11px;padding:2px 9px;border-radius:999px;cursor:pointer;background:transparent">Classify All</button>${chev(open)}</div>`;
     if (edit && edit.key === 'g:' + g.base) h += editorHtml(g.base);
     if (open) h += ls.map(l => lessonRow(l)).join('');
     return h;
@@ -373,7 +373,7 @@
     const open = query ? true : openKeys.has('uc');
     parentOf.set('uc', 'root');
     const total = model.uncl.reduce((n, g) => n + g.lessons.length, 0);
-    let h = `<div data-tg data-k="uc" data-p="root" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer"><div class="bg-gold-50 text-gold-700 border border-gold-200" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🗂️</div><div style="flex:1"><div class="text-gold-700 font-thmanyah" style="font-size:17px;font-weight:700">غير مصنّف</div><div class="text-gray-500" style="font-size:12px">${total} درس مستنيين تصنيفك</div></div>${chev(open)}</div>`;
+    let h = `<div data-tg data-k="uc" data-p="root" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer"><div class="bg-gold-50 text-gold-700 border border-gold-200" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🗂️</div><div style="flex:1"><div class="text-gold-700 font-thmanyah" style="font-size:17px;font-weight:700">Unclassified</div><div class="text-gray-500" style="font-size:12px">${total} lessons awaiting classification</div></div>${chev(open)}</div>`;
     if (open) h += body;
     return sectionShell(h, 'border-gold-200');
   }
@@ -391,34 +391,34 @@
         (o ? ls.map(l => lessonRow(l, true)).join('') : '');
     }).join('');
     if (!body) return '';
-    let h = `<div data-tg data-k="lit" data-p="root" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer"><div class="bg-green-50 text-green-800 border border-green-200" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🎓</div><div style="flex:1"><div class="text-green-800 font-thmanyah" style="font-size:17px;font-weight:700">القسم الأدبي</div><div class="text-gray-500" style="font-size:12px;margin-bottom:6px">${c.d}/${c.t} درس</div>${bar(c.p)}</div>${chev(open)}</div>`;
+    let h = `<div data-tg data-k="lit" data-p="root" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer"><div class="bg-green-50 text-green-800 border border-green-200" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🎓</div><div style="flex:1"><div class="text-green-800 font-thmanyah" style="font-size:17px;font-weight:700">Literature Section</div><div class="text-gray-500" style="font-size:12px;margin-bottom:6px">${c.d}/${c.t} lessons</div>${bar(c.p)}</div>${chev(open)}</div>`;
     if (open) h += body;
     return sectionShell(h);
   }
   function bannerHtml() {
     const msg = !hookOn()
-      ? 'الجزء اللي بيلقط بيانات الكورس مش شغال. اتأكد إن Chrome إصدار 111 أو أحدث، وإنك عملت Reload للإضافة من chrome://extensions، وبعدها اضغط F5.'
-      : 'مستنيين بيانات الكورس من الموقع… لو ما ظهرتش خلال ثواني اضغط الزرار.';
-    return sectionShell(`<div class="text-green-900" style="padding:16px;font-size:14px;line-height:1.8">${msg}<div style="margin-top:10px"><button type="button" data-reload class="${smallBtn}">إعادة تحميل الصفحة</button></div></div>`);
+      ? 'The course data collector is not running. Make sure Chrome is version 111 or newer, reload the extension from chrome://extensions, and then press F5.'
+      : 'Waiting for course data from the website. If it does not appear within a few seconds, press the button.';
+    return sectionShell(`<div class="text-green-900" style="padding:16px;font-size:14px;line-height:1.8">${msg}<div style="margin-top:10px"><button type="button" data-reload class="${smallBtn}">Reload Page</button></div></div>`);
   }
   function contHtml() {
     if (query) return '';
     const l = nextLesson();
     if (!l) return '';
     const b = model.blockByKey.get(l.sid + '|' + l.base);
-    return `<div data-open="${l.id}" class="bg-gold-50 border border-gold-200" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;cursor:pointer"><span style="font-size:20px">▶️</span><div style="flex:1;min-width:0"><div class="text-gold-700" style="font-size:14px;font-weight:700">كمّل من حيث وقفت</div><div class="text-green-900" style="font-size:12px;word-break:break-word">${esc(subName(l.sid))}${b ? ' · ' + esc(b.label) : ''}: ${esc(l.name)}</div></div></div>`;
+    return `<div data-open="${l.id}" class="bg-gold-50 border border-gold-200" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;cursor:pointer"><span style="font-size:20px">▶️</span><div style="flex:1;min-width:0"><div class="text-gold-700" style="font-size:14px;font-weight:700">Continue Where You Left Off</div><div class="text-green-900" style="font-size:12px;word-break:break-word">${esc(subName(l.sid))}${b ? ' · ' + esc(b.label) : ''}: ${esc(l.name)}</div></div></div>`;
   }
   function listHtml() {
     if (!model) return bannerHtml();
     const out = model.subjects.filter(s => !settings.hiddenSubs.includes(s.id)).map(subjectHtml).join('') + unclassifiedHtml() + litHtml();
-    return out || sectionShell('<div class="text-gray-500" style="padding:16px;font-size:14px">' + (query ? 'مفيش درس بالاسم ده.' : 'مفيش حاجة تتعرض.') + '</div>');
+    return out || sectionShell('<div class="text-gray-500" style="padding:16px;font-size:14px">' + (query ? 'No lesson matches this name.' : 'Nothing to display.') + '</div>');
   }
   const $ = id => document.getElementById(id);
   function renderList() { const el = $('nahj-list'); if (!el) return; parentOf.clear(); el.innerHTML = listHtml(); }
   function renderCont() { const el = $('nahj-cont'); if (el) el.innerHTML = model ? contHtml() : ''; }
   function renderView() { renderCont(); renderList(); emit(); }
 
-  // ===== التفاعل =====
+  // ===== Interaction =====
   function toggleKey(el, add) {
     const k = el.getAttribute('data-k'), p = el.getAttribute('data-p');
     const sib = [...openKeys].filter(x => x !== k && parentOf.get(x) === p);
@@ -435,7 +435,7 @@
   function finishEdit() { edit = null; saveSettings(); rebuild(); renderView(); }
   function pickSubject(id) {
     if (id === '__ns') {
-      const n = prompt('اسم المادة الجديدة؟');
+      const n = prompt('Name of the new subject?');
       if (!n || !n.trim()) return;
       id = 'x:' + n.trim();
       settings.customSubjects[id] = n.trim();
@@ -447,7 +447,7 @@
   function pickLecture(base) {
     if (!edit || !edit.sid) return;
     if (base === '__nl') {
-      const n = prompt('اسم المحاضرة الجديدة؟');
+      const n = prompt('Name of the new lecture?');
       if (!n || !n.trim()) return;
       base = 'c:' + n.trim();
       settings.customLec[base] = { name: n.trim(), s: edit.sid };
@@ -467,13 +467,13 @@
     if (t.closest('[data-cancel]')) { edit = null; renderList(); return; }
     if (t.closest('[data-reload]')) { location.reload(); return; }
     const rf = t.closest('[data-refresh]');
-    if (rf) { rf.textContent = 'جاري التحديث…'; window.postMessage({ source: 'nahj-ext', type: 'refetch' }, '*'); setTimeout(() => { rf.textContent = '🔄 تحديث'; }, 4000); return; }
+    if (rf) { rf.textContent = 'Updating…'; window.postMessage({ source: 'nahj-ext', type: 'refetch' }, '*'); setTimeout(() => { rf.textContent = '🔄 Refresh'; }, 4000); return; }
     if (t.closest('[data-collapse]')) { openKeys.clear(); write(OPEN_KEY, []); renderList(); return; }
     const op = t.closest('[data-open]'); if (op) { openLesson(+op.getAttribute('data-open')); return; }
     const tg = t.closest('[data-tg]'); if (tg) toggleKey(tg, e.ctrlKey || e.metaKey);
   }
 
-  // ===== فتح الدرس (من جوا الموقع من غير إعادة تحميل، وإلا بالرابط) =====
+  // ===== Open Lesson =====
   async function openLesson(id) {
     const l = model && model.byId.get(id);
     if (!l || busy) return;
@@ -496,7 +496,7 @@
     } finally { busy = false; }
   }
 
-  // ===== التركيب =====
+  // ===== Assembly =====
   function reveal(id) {
     const l = model && model.byId.get(+id);
     if (!l) return;
@@ -521,9 +521,9 @@
     v.id = 'nahj-view';
     v.setAttribute('data-nahj', '');
     v.style.cssText = 'display:flex;flex-direction:column;gap:12px;margin-top:8px';
-    v.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 4px"><span class="text-green-800 font-thmanyah" style="font-size:18px;font-weight:700;flex:1;min-width:110px">محتوى المواد</span>` +
-      `<input id="nahj-q" type="search" placeholder="ابحث عن درس…" class="border border-green-200/70 bg-white text-green-900" style="padding:6px 12px;border-radius:10px;font-size:13px;min-width:150px">` +
-      `<button type="button" data-collapse class="${smallBtn}">طي الكل</button><button type="button" data-refresh class="${smallBtn}">🔄 تحديث</button></div>` +
+    v.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 4px"><span class="text-green-800 font-thmanyah" style="font-size:18px;font-weight:700;flex:1;min-width:110px">Subject Content</span>` +
+      `<input id="nahj-q" type="search" placeholder="Search for a lesson…" class="border border-green-200/70 bg-white text-green-900" style="padding:6px 12px;border-radius:10px;font-size:13px;min-width:150px">` +
+      `<button type="button" data-collapse class="${smallBtn}">Collapse All</button><button type="button" data-refresh class="${smallBtn}">🔄 Refresh</button></div>` +
       `<div id="nahj-cont"></div><div id="nahj-list" style="display:flex;flex-direction:column;gap:12px"></div>`;
     v.addEventListener('click', onViewClick);
     v.addEventListener('input', e => { if (e.target.id === 'nahj-q') { query = e.target.value; renderList(); renderCont(); } });

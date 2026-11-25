@@ -3,9 +3,9 @@
 #ifndef PROCESS_H
 #define PROCESS_H
 
-#include "enumeration.h"
+#include "core/datetime.h"
 #include "core/math.h"
 #include "core/string.h"
-#include "core/datetime.h"
+#include "enumeration.h"
 
-#endif // PROCESS_H
+#endif  // PROCESS_H

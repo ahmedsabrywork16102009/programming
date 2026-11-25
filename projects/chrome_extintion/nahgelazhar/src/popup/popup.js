@@ -24,8 +24,8 @@ resetBtn.addEventListener('click', () => {
   if (!sure) {
     sure = true;
     resetBtn.classList.add('sure');
-    resetBtn.textContent = 'اضغط تاني للتأكيد';
-    setTimeout(() => { sure = false; resetBtn.classList.remove('sure'); resetBtn.textContent = 'مسح تصنيفاتي اليدوية'; }, 3000);
+    resetBtn.textContent = 'Press again to confirm';
+    setTimeout(() => { sure = false; resetBtn.classList.remove('sure'); resetBtn.textContent = 'Clear My Manual Classifications'; }, 3000);
     return;
   }
   chrome.storage.local.get(KEY, r => {
@@ -35,6 +35,6 @@ resetBtn.addEventListener('click', () => {
   });
   sure = false;
   resetBtn.classList.remove('sure');
-  resetBtn.textContent = '✅ تم المسح';
-  setTimeout(() => { resetBtn.textContent = 'مسح تصنيفاتي اليدوية'; }, 1500);
+  resetBtn.textContent = '✅ Cleared';
+  setTimeout(() => { resetBtn.textContent = 'Clear My Manual Classifications'; }, 1500);
 });

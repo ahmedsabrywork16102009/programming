@@ -37,12 +37,12 @@ async function collectCurrent() {
     )
   ) {
     $('pageNotice').textContent =
-      'افتح صفحة المقرر أو الدرس على موقع معهد ابن مالك أولًا.';
+      'Open a course or lesson page on the Ibn Malek website first.';
     return;
   }
 
   $('scanBtn').disabled = true;
-  $('pageNotice').textContent = 'جاري قراءة الصفحة الحالية…';
+  $('pageNotice').textContent = 'Reading the current page…';
 
   try {
     const payload = await chrome.tabs
@@ -63,7 +63,7 @@ async function collectCurrent() {
       });
 
     if (!payload?.ok) {
-      throw new Error(payload?.error || 'تعذر قراءة الصفحة');
+      throw new Error(payload?.error || 'Could not read the page');
     }
 
     const res = await bg({
@@ -73,19 +73,19 @@ async function collectCurrent() {
 
     const type =
       payload.kind === 'lesson'
-        ? 'صفحة درس'
-        : 'صفحة مقرر';
+        ? 'Lesson page'
+        : 'Course page';
 
     $('pageNotice').textContent =
-      `تم فحص ${type}: ${payload.pageTitle || tab.url}. ` +
-      `جديد: ${res.result.added}، ` +
-      `متغير: ${res.result.changed}، ` +
-      `دون تغيير: ${res.result.unchanged}.`;
+      `Checked ${type}: ${payload.pageTitle || tab.url}. ` +
+      `New: ${res.result.added}, ` +
+      `Changed: ${res.result.changed}, ` +
+      `Unchanged: ${res.result.unchanged}.`;
 
     await refresh();
   } catch (e) {
     $('pageNotice').textContent =
-      'تعذر جمع البيانات: ' + e.message;
+      'Could not collect data: ' + e.message;
   } finally {
     $('scanBtn').disabled = false;
   }
@@ -147,16 +147,16 @@ async function refresh() {
   $('progressBar').style.width = pct + '%';
 
   $('currentTask').textContent =
-    task.current || 'لا توجد مهمة قيد التشغيل.';
+    task.current || 'No task is running.';
 
   const pill = $('statusPill');
   const status = task.status || 'idle';
 
   pill.textContent = ({
-    idle: 'جاهز',
-    running: 'جارٍ العمل',
-    done: 'اكتمل',
-    'done-with-errors': 'اكتمل مع أخطاء'
+    idle: 'Ready',
+    running: 'Running',
+    done: 'Completed',
+    'done-with-errors': 'Completed with errors'
   })[status] || status;
 
   pill.className =
@@ -173,8 +173,8 @@ async function refresh() {
 
   $('lastSaved').textContent =
     s.db.meta?.updatedAt
-      ? 'آخر حفظ: ' + fmtTime(s.db.meta.updatedAt)
-      : 'البيانات محفوظة على هذا المتصفح';
+      ? 'Last saved: ' + fmtTime(s.db.meta.updatedAt)
+      : 'Data is saved in this browser';
 
   const logs = s.logs || [];
 
@@ -182,7 +182,7 @@ async function refresh() {
 
   if (!logs.length) {
     $('logList').innerHTML =
-      '<li class="empty">ستظهر هنا خطوات الإضافة ونتائجها.</li>';
+      '<li class="empty">Extension steps and results will appear here.</li>';
   }
 
   for (const row of logs.slice(0, 35)) {
@@ -202,10 +202,10 @@ async function refresh() {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
+    '&': '&',
+    '<': '<',
+    '>': '>',
+    '"': '"',
     "'": '&#39;'
   })[c]);
 }
@@ -232,7 +232,7 @@ $('forceScanBtn').addEventListener(
   async () => {
     if (
       confirm(
-        'إعادة فتح كل صفحات الدروس حتى لو كانت بياناتها حديثة؟ قد يستغرق ذلك وقتًا أطول.'
+        'Reopen every lesson page even if its data is current? This may take longer.'
       )
     ) {
       await bg({
@@ -335,7 +335,7 @@ async function saveSettings() {
     !activeTab?.url?.includes('tamayyuzcenter.com')
   ) {
     $('pageNotice').textContent =
-      'افتح صفحة المقرر أو الدرس في معهد ابن مالك.';
+      'Open a course or lesson page on the Ibn Malek website.';
   }
 
   await refresh();

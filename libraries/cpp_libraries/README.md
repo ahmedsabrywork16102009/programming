@@ -1,8 +1,8 @@
-# مكتبات Ahmed Sabry لـ C++
+# Ahmed Sabry C++ Libraries
 
-المكتبات **Header-Only** ومقسمة حسب المسؤولية. استخدم أصغر header تحتاجه، واستدعِ الدوال باسم المكتبة مثل `bank::` و`storage::` بدون `using namespace`.
+These are **header-only** libraries organized by responsibility. Include only the header you need and call functions through their namespace, such as `bank::` or `storage::`, instead of using `using namespace`.
 
-## هيكل المجلدات بالتفصيل
+## Folder Structure
 
 ```text
 programming/
@@ -12,160 +12,108 @@ programming/
         ├── as.h
         ├── enumeration.h
         ├── process.h
-        │
         ├── core/
         │   ├── math.h
         │   ├── string.h
         │   └── datetime.h
-        │
         ├── io/
         │   ├── input.h
         │   └── output.h
-        │
         ├── storage/
         │   └── file_utils.h
-        │
         └── domain/
             ├── bank.h
             └── clients.h
 ```
 
-### المسار الأساسي
+## Library Location
 
-جذر المكتبات الفعلي هو:
+The actual library root is:
 
 ```text
 programming/libraries/cpp_libraries/
 ```
 
-أما مجلد `libraries` فليس داخل مشروع البنك؛ لذلك المسار التالي غير صحيح:
+The `libraries` folder is not inside the bank project. The following path is incorrect:
 
 ```text
 projects/cpp_projects/bank/libraries/cpp_libraries/
 ```
 
-ومن مجلد مشروع البنك إلى المكتبات يكون المسار النسبي:
+From the bank project folder, use this relative path:
 
 ```text
 ../../../libraries/cpp_libraries/
 ```
 
-عند ضبط IntelliSense أو المترجم، أضف مجلد `cpp_libraries` نفسه إلى include path. عندها يمكن كتابة:
+Add `cpp_libraries` itself to the compiler and IntelliSense include paths:
 
 ```cpp
 #include "domain/bank.h"
 ```
 
-بدل كتابة المسار النسبي الطويل في كل ملف.
+## Root Files and Modules
 
-## 1. ملفات الجذر ووحدات المكتبة
+### `as.h` - Library Aggregator
 
-الجذر يحتوي المجمع الاختياري وبعض واجهات المكتبة العامة. وحدات الإدخال والإخراج والعملاء موجودة مرة واحدة فقط داخل مجلداتها المتخصصة.
+Includes the modules and provides aliases such as `AS::bank::` and `AS::storage::`.
 
-#### `as.h` — مجمّع المكتبات
+### `enumeration.h` - Enumerations
 
-يضم الوحدات ويوفر aliases منظمة مثل `AS::bank::` و`AS::storage::`.
+Defines general enums for numbers, characters, months, weekdays, operations, and date formats.
 
-استخدمه عندما تريد تضمين معظم المكتبات من نقطة دخول واحدة. وهو اختياري.
+Namespace: `enumeration::`
 
-#### `enumeration.h` — التعدادات
+### `process.h` - Compatibility Interface
 
-يعرّف enums العامة الخاصة بالأعداد والحروف والأشهر والأيام والعمليات وتنسيقات التواريخ.
+Combines `enumeration.h` and `core` tools for older projects.
 
-مساحة الاسم: `enumeration::`
+Namespace: `process::`
 
-#### `process.h` — واجهة المعالجة التوافقية
+### Input and Output
 
-يجمع `enumeration.h` وأدوات `core`، ويسهّل استخدام المشاريع القديمة لهذه الأدوات.
+- `io/input.h`, namespace `input::`
+- `io/output.h`, namespace `output::`
 
-مساحة أسماء أدوات المعالجة: `process::`
+### `domain/clients.h` - Clients
 
-#### وحدات الإدخال والإخراج
+Contains the client implementation in the `clients::` namespace.
 
-هذه هي الملفات الفعلية، وليست لها نسخ مكررة في الجذر:
+## Core Utilities
 
-- `io/input.h`، مساحة الاسم `input::`.
-- `io/output.h`، مساحة الاسم `output::`.
+### `core/math.h`
 
-#### `domain/clients.h` — وحدة العملاء
+General arithmetic operations and number checks.
 
-يحتوي التنفيذ الفعلي للعملاء، ومساحة الاسم المستخدمة هي `clients::`. لا توجد نسخة أخرى منه في الجذر.
+### `core/string.h`
 
-#### `README.md` — دليل المكتبة
+Text splitting, replacement, and whitespace removal.
 
-يوضح بنية المكتبات، اتجاه اعتماد الوحدات، وكيفية اختيار المكان المناسب لأي إضافة.
+Example: `process::splitByString(...)`
 
-### الفرق بين `as.h` و`process.h`
+### `core/datetime.h`
 
-- `as.h` يضم الوحدات المختلفة كلها، بما فيها `bank` و`clients`، ويوفر مسارات واضحة مثل `AS::bank::` و`AS::input::`.
-- `process.h` يجمع أدوات المعالجة الأساسية، وهو موجود لتسهيل استخدام بعض المشاريع القديمة؛ ليس بديلًا عن `as.h`.
-- لا يستورد أي منهما أسماء الدوال بشكل مسطح، ولا تحتاج إلى `using namespace`.
+Date and period types, calendar calculations, and date operations.
 
-## 2. `core/` — الأدوات الأساسية
+## Input and Output
 
-تحتوي على وظائف عامة يمكن استخدامها دون واجهة مستخدم أو ملفات أو منطق بنك.
+`io/input.h` reads and validates strings, numbers, choices, and dates.
 
-#### `core/math.h` — الرياضيات
+`io/output.h` prints strings, tables, and dates and manages screen reset.
 
-يحتوي عمليات وفحوصات حسابية عامة، مثل فحص نوع العدد واستخدام عمليات النطاقات.
+## Storage
 
-#### `core/string.h` — النصوص
+`storage/file_utils.h` provides common text-file operations. It knows only text lines and file paths.
 
-يحتوي أدوات معالجة النصوص مثل التقسيم والتغيير وإزالة المسافات.
+### Checked Operations
 
-مثال: `process::splitByString(...)`
+- `storage::loadLinesFromFileChecked(...)`
+- `storage::writeLinesToFileChecked(...)`
+- `storage::appendLineToFileChecked(...)`
+- `storage::stFileResult`
+- `storage::reportFileError(...)`
 
-#### `core/datetime.h` — التاريخ والوقت
-
-يحتوي أنواع التاريخ والفترة وحسابات التقويم والتواريخ.
-
-أمثلة: `process::stDate`، حساب اليوم، أو إيجاد الفرق بين تاريخين.
-
-دوال هذه الملفات ضمن `process::`. هذه الطبقة هي الأساس الذي يمكن أن تعتمد عليه طبقات أعلى، ولا ينبغي أن تعتمد على `domain/` أو على شاشات البنك.
-
-## 3. `io/` — الإدخال والإخراج
-
-هذه الطبقة مسؤولة عن التفاعل مع الطرفية:
-
-#### `io/input.h` — قراءة الإدخال
-
-يقرأ النصوص والأرقام والاختيارات والتواريخ، ويتحقق من صحة الإدخال.
-
-أمثلة: `input::readString(...)` و`input::readNumber<int>(...)`
-
-#### `io/output.h` — عرض النتائج
-
-يطبع النصوص والجداول والتواريخ، ويدير إعادة تهيئة الشاشة.
-
-أمثلة: `output::printDateDetails(...)` و`output::resetScreen(...)`
-
-قد تعتمد `input` على `output` أو `core`، لكن لا تضع فتح الملفات أو تحويل بيانات البنك داخل `io/`.
-
-## 4. `storage/` — إدارة الملفات
-
-`storage/file_utils.h` هو المكان الموحد للتعامل العام مع الملفات النصية. هذه الطبقة تعرف الأسطر (`std::string`) فقط، ولا تعرف ما هو عميل أو مستخدم أو حساب بنكي.
-
-#### `storage::loadLinesFromFileChecked(...)`
-
-يحمّل الأسطر من الملف إلى `std::vector<std::string>`.
-
-#### `storage::writeLinesToFileChecked(...)`
-
-يكتب مجموعة أسطر إلى الملف.
-
-#### `storage::appendLineToFileChecked(...)`
-
-يضيف سطرًا في نهاية الملف.
-
-#### `storage::stFileResult`
-
-نتيجة العملية؛ يحتوي `succeeded` للنجاح و`message` لتفاصيل الخطأ.
-
-#### `storage::reportFileError(...)`
-
-يطبع تفاصيل الخطأ إلى `std::cerr`.
-
-مثال قراءة مع فحص النتيجة:
+Example:
 
 ```cpp
 #include "storage/file_utils.h"
@@ -179,33 +127,23 @@ if (!fileResult.succeeded) {
 }
 ```
 
-`loadLinesFromFileChecked` يتجاهل الأسطر الفارغة افتراضيًا. مرّر `true` كوسيط ثالث للاحتفاظ بها:
+Legacy file functions remain available for compatibility.
 
-```cpp
-storage::loadLinesFromFileChecked("files/Clients.txt", vLines, true);
-```
+## Domain Data
 
-الدوال القديمة `loadLinesFromFile` و`writeLinesToFile` و`appendLineToFile` ما زالت متاحة للتوافق. عند فشلها تطبع الخطأ إلى `std::cerr`؛ في الكود الجديد يفضل استخدام الدوال المنتهية بـ`Checked` وفحص `succeeded`.
+### `domain/clients.h`
 
-## 5. `domain/` — بيانات وقواعد المجال
+Contains customer data types and operations and uses `storage` for loading and saving.
 
-تحتوي هذه الطبقة أنواع البيانات والعمليات التي تفهم معنى السجلات. هي المكان المناسب لربط سجل العميل بقواعد البنك، لكنها لا ينبغي أن تعيد كتابة قارئ ملفات عام موجود في `storage/`.
+Namespace: `clients::`
 
-#### `domain/clients.h` — نطاق العملاء
+### `domain/bank.h`
 
-يحتوي نوع العميل وقراءة بياناته وتعديلها وتحويله بين سجل وسطر وعرضه. يستخدم `storage` للحفظ والتحميل.
+Contains bank client types, searches, balance operations, and CRUD operations shared by bank and ATM projects.
 
-مساحة الاسم: `clients::`
+Namespace: `bank::`
 
-#### `domain/bank.h` — نطاق البنك
-
-يحتوي أنواع البنك `stClientData` و`stUser`، والتحويل والبحث وعمليات الرصيد وعمليات CRUD المشتركة بين برنامج البنك وATM. يستخدم `storage` للملفات.
-
-مساحة الاسم: `bank::`
-
-النوعان `clients::stClientData` و`bank::stClientData` تابعان لوحدتين مختلفتين. لا تخلط بينهما؛ اختر النوع الذي تستخدمه بقية واجهة مشروعك.
-
-مثال استدعاء مباشر:
+Example:
 
 ```cpp
 #include "domain/bank.h"
@@ -214,9 +152,7 @@ std::vector<bank::stClientData> vClients =
     bank::loadClientDataFromFile("files/Clients.txt");
 ```
 
-## 6. اتجاه الاعتماد بين الطبقات
-
-اتجاه السهم هنا يعني أن الملف على اليسار يعتمد على الملف على اليمين:
+## Dependency Direction
 
 ```text
 process.h
@@ -233,56 +169,37 @@ io/output.h
   └── enumeration.h
 
 storage/file_utils.h
-  └── مستقل؛ يتعامل مع مسارات وأسطر نصية فقط
+  └── Independent file and text-line operations
 
 domain/clients.h
-  ├── core/string.h + enumeration.h
+  ├── core/string.h
   ├── io/{input,output}.h
   └── storage/file_utils.h
 
 domain/bank.h
-  ├── io/input.h + io/output.h + process.h
+  ├── io/input.h
+  ├── io/output.h
   └── storage/file_utils.h
-
-as.h
-  └── يجمع الوحدات السابقة ويعرض aliases اختيارية لها
 ```
 
-قواعد الاعتماد:
+## Where to Add New Code
 
-1. `core/` لا يعتمد على `io/` أو `storage/` أو `domain/`.
-2. `io/` يستخدم الأدوات الأساسية عند الحاجة، ويبقى مسؤولًا عن الطرفية.
-3. `storage/` مستقل عن أنواع البيانات؛ يأخذ مسار ملف وأسطرًا نصية ويعيد نتيجة.
-4. `domain/` يستخدم `storage/` للحفظ والتحميل، ويحول الأسطر إلى أنواع المجال والعكس.
-5. `as.h` يجمع الوحدات للاستخدام الاختياري، لكنه لا يدمج أسماءها في مساحة واحدة.
+- General algorithms: `core/`
+- Terminal interaction: `io/`
+- General file operations: `storage/`
+- Customer or bank rules: `domain/`
+- Existing module functionality: place it in that module's directory
 
-## 7. أضع ملفًا أو وظيفة جديدة فين؟
+## Usage
 
-- خوارزمية عامة لا تخص مجالًا بعينه؟ ضعها في `core/`.
-- قراءة أو طباعة تفاعلية؟ ضعها في `io/`.
-- فتح أو قراءة أو كتابة ملف بغض النظر عن محتواه؟ ضعها في `storage/`.
-- نوع بيانات أو قواعد خاصة بالعملاء أو البنك؟ ضعها في `domain/`.
-- ملف يخص وحدة موجودة؟ ضعه في مجلدها المتخصص، ولا تنشئ wrapper مكررًا في الجذر.
-
-عند إضافة وحدة جديدة:
-
-1. اختر الطبقة المناسبة أولًا.
-2. أنشئ التنفيذ داخل المجلد المسؤول.
-3. استخدم namespace باسم الوحدة، مثل `storage::` أو `bank::`.
-4. لا تضف `using namespace` في header.
-5. أضف الوحدة إلى `as.h` فقط إذا كانت عامة ومناسبة للمجمّع.
-6. حدّث هذا الدليل واختبر المشاريع التي تستخدم الوحدة.
-
-## الاستخدام
-
-أضف `libraries/cpp_libraries` إلى مسار تضمين المترجم وIntelliSense، ثم ضمّن أصغر وحدة تحتاجها:
+Include only the module you need:
 
 ```cpp
 #include "domain/bank.h"
 #include "storage/file_utils.h"
 ```
 
-أو استخدم المجمع الاختياري مع إبقاء أسماء الوحدات واضحة:
+Or use the optional aggregator:
 
 ```cpp
 #include "as.h"
@@ -292,4 +209,4 @@ auto today = AS::process::getSystemDate();
 AS::output::printDateDetails(today, "Today is: ");
 ```
 
-استخدم بادئة المكتبة (`bank::` أو `storage::` أو `process::`) بدلًا من `using namespace`.
+Prefer library prefixes instead of `using namespace`.
