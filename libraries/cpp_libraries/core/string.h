@@ -15,30 +15,30 @@ namespace process {
 	//  Declarations
 	// ===========================================================================
 
-	std::vector<char> getFirstLetters(std::string_view text, int pos = 1);
-	std::string getLowerFirstLetters(std::string_view text);
-	char invertChar(char letter) noexcept;
 	std::string changeCharCase(std::string_view text, enumeration::enCharCase charCase);
 	int countCapitalLetters(std::string_view text) noexcept;
+	int countLetter(std::string_view text, char targetChar, bool matchCase = true) noexcept;
 	int countSmallLetters(std::string_view text) noexcept;
 	int countSpaces(std::string_view text) noexcept;
-	int countLetter(std::string_view text, char targetChar, bool matchCase = true) noexcept;
-	bool isVowel(char letter, bool matchCase = true) noexcept;
 	int countVowels(std::string_view text, bool matchCase = true) noexcept;
-	std::vector<char> getVowels(std::string_view text, bool matchCase = true);
-	std::vector<std::string> split(std::string_view text, char delimiter = ' ');
 	int countWords(std::string_view text, char delimiter = ' ');
-	std::string trimLeft(std::string_view text, char delimiter = ' ');
-	std::string trimRight(std::string_view text, char delimiter = ' ');
-	std::string trimAll(std::string_view text, char delimiter = ' ');
-	std::string trimString(std::string_view text, enumeration::enTrim trimType);
+	std::vector<char> getFirstLetters(std::string_view text, int pos = 1);
+	std::string getLowerFirstLetters(std::string_view text);
+	std::vector<char> getVowels(std::string_view text, bool matchCase = true);
+	char invertChar(char letter) noexcept;
+	bool isVowel(char letter, bool matchCase = true) noexcept;
 	std::string joinStrings(const std::vector<std::string> &vStrings, std::string_view delimiter = " ", bool isReverse = false);
-	std::string stripPunctuation(std::string_view text);
+	std::string numberToText(long long number, enumeration::enLanguage language = enumeration::EN);
+	std::string replaceAll(std::string_view text, std::string_view stringToReplace, std::string_view sReplaceTo, bool matchCase = true);
+	std::vector<std::string> split(std::string_view text, char delimiter = ' ');
 	std::vector<std::string> splitByString(std::string_view text, std::string_view delimiter = "#//#");
+	std::string stripPunctuation(std::string_view text);
 	std::string toLower(std::string_view text);
 	std::string toUpper(std::string_view text);
-	std::string replaceAll(std::string_view text, std::string_view stringToReplace, std::string_view sReplaceTo, bool matchCase = true);
-	std::string numberToText(long long number, enumeration::enLanguage language = enumeration::EN);
+	std::string trimAll(std::string_view text, char delimiter = ' ');
+	std::string trimLeft(std::string_view text, char delimiter = ' ');
+	std::string trimRight(std::string_view text, char delimiter = ' ');
+	std::string trimString(std::string_view text, enumeration::enTrim trimType);
 
 	// ===========================================================================
 	//  Implementations

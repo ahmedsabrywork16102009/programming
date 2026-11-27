@@ -20,25 +20,21 @@ namespace output {
 	//  Declarations
 	// =============================================================
 
-	void printString(std::string_view string);
-	void printStringWithSuffix(std::string_view string, std::string_view suffix);
-	void printString(std::string_view prefix, std::string_view string);
-	void printString(std::string_view prefix, std::string_view string, std::string_view suffix);
-
-	void printNumberType(int number, std::string_view evenMessage = "Number is Even.", std::string_view oddMessage = "Number is Odd.");
-
-	void printVector(const std::vector<int> &vec, std::string_view separator = " ");
-	void printVector(const std::vector<char> &vec, std::string_view separator = " ");
-	void printVector(const std::vector<std::string> &vec, std::string_view separator = " ");
-
-	void printEachWordInLine(std::string_view text, char delimiter = ' ', std::string_view separator = "\n");
-
-	void resetScreen(bool clearScreen = true, bool color = true, short timeoutInSeconds = 0);
-	void printMonthCalendar(const enumeration::enMonth month, const std::size_t year);
-	void printYearCalendar(const std::size_t year);
 	void printDate(process::stDate date);
 	void printDate(std::string_view dateString);
 	void printDateDetails(process::stDate date, std::string_view suffix = "Day: ");
+	void printEachWordInLine(std::string_view text, char delimiter = ' ', std::string_view separator = "\n");
+	void printMonthCalendar(const enumeration::enMonth month, const std::size_t year);
+	void printNumberType(int number, std::string_view evenMessage = "Number is Even.", std::string_view oddMessage = "Number is Odd.");
+	void printString(std::string_view string);
+	void printString(std::string_view prefix, std::string_view string);
+	void printString(std::string_view prefix, std::string_view string, std::string_view suffix);
+	void printStringWithSuffix(std::string_view string, std::string_view suffix);
+	void printVector(const std::vector<int> &vec, std::string_view separator = " ");
+	void printVector(const std::vector<char> &vec, std::string_view separator = " ");
+	void printVector(const std::vector<std::string> &vec, std::string_view separator = " ");
+	void printYearCalendar(const std::size_t year);
+	void resetScreen(bool clearScreen = true, bool color = true, short timeoutInSeconds = 0);
 
 	// =============================================================
 	//  Implementations

@@ -31,26 +31,20 @@ namespace clients {
 	//  Declarations
 	// =============================================================
 
-	stClientData readNewClient();
-	void updateClientData(stClientData &clientData);
-
-	std::string convertStructToLine(const stClientData &clientData, std::string_view separator = "#//#");
-
-	stClientData convertLineToRecord(std::string_view text, std::string_view delimiter = "#//#");
-	bool tryConvertLineToRecord(std::string_view text, stClientData &clientData, std::string_view delimiter = "#//#");
-
-	void addLineDataToFile(std::string_view fileName, std::string_view lineData);
 	void addClientsToFile(std::string_view fileName);
-
-	std::vector<stClientData> loadDataFromFile(std::string_view fileName);
-	void saveDataToFile(std::string_view fileName, const std::vector<stClientData> &vClients);
-
-	void printAllClientsInTableView(const std::vector<stClientData> &vClients);
-	int getIndexOfClientByAccountNumber(const std::vector<stClientData> &vClients, std::string_view accountNumber);
-	void printClientDataVertical(const std::vector<stClientData> &vClients, int index);
-
+	void addLineDataToFile(std::string_view fileName, std::string_view lineData);
+	stClientData convertLineToRecord(std::string_view text, std::string_view delimiter = "#//#");
+	std::string convertStructToLine(const stClientData &clientData, std::string_view separator = "#//#");
 	bool deleteClientData(std::vector<stClientData> &vClients, std::string_view accountNumber);
 	bool editClientData(std::vector<stClientData> &vClients, std::string_view accountNumber);
+	int getIndexOfClientByAccountNumber(const std::vector<stClientData> &vClients, std::string_view accountNumber);
+	std::vector<stClientData> loadDataFromFile(std::string_view fileName);
+	void printAllClientsInTableView(const std::vector<stClientData> &vClients);
+	void printClientDataVertical(const std::vector<stClientData> &vClients, int index);
+	stClientData readNewClient();
+	void saveDataToFile(std::string_view fileName, const std::vector<stClientData> &vClients);
+	bool tryConvertLineToRecord(std::string_view text, stClientData &clientData, std::string_view delimiter = "#//#");
+	void updateClientData(stClientData &clientData);
 
 	// =============================================================
 	//  Implementations

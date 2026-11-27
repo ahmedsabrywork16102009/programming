@@ -1,5 +1,7 @@
 #pragma once
 
+#include <charconv>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -37,16 +39,20 @@ namespace bank {
 	//  Shared Conversion Helpers
 	// =============================================================
 	inline bool tryParseNumber(std::string_view text, double &value) {
-		try {
-			std::size_t processedCharacters = 0;
-			value = std::stod(std::string(text), &processedCharacters);
-			return processedCharacters == text.size();
-		} catch (const std::invalid_argument &) {
-			return false;
-		} catch (const std::out_of_range &) {
+		const auto first = text.find_first_not_of(" \t\n\r");
+		if (first == std::string_view::npos) {
 			return false;
 		}
+		const auto last = text.find_last_not_of(" \t\n\r");
+		text = text.substr(first, last - first + 1);
+
+		const char *begin = text.data();
+		const char *end = begin + text.size();
+		auto [ptr, ec] = std::from_chars(begin, end, value);
+		return ec == std::errc{} && ptr == end;
 	}
+
+	bool nearlyEqual(double a, double b, double eps = 1e-9) { return std::fabs(a - b) <= eps; }
 
 	inline bool tryParseNumber(std::string_view text, short &value) {
 		try {
@@ -471,9 +477,7 @@ namespace bank {
 			const std::string line(52, '-');
 			std::cout << "\n" << std::setw(45) << "Number of Users: " << vRecords.size() << "\n";
 			std::cout << line << "\n";
-			std::cout << "| " << std::left << std::setw(16) << "User Name"
-			          << " | " << std::setw(14) << "Password"
-			          << " | " << std::setw(12) << "Permission" << " |\n";
+			std::cout << "| " << std::left << std::setw(16) << "User Name" << " | " << std::setw(14) << "Password" << " | " << std::setw(12) << "Permission" << " |\n";
 			std::cout << line << "\n";
 
 			for (const stUser &record : vRecords) {

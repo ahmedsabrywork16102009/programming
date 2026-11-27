@@ -61,62 +61,59 @@ namespace process {
 
 	// ==================================================================
 	//  Calendar Math Declarations
-	// ==================================================================
-
-	constexpr bool isLeapYear(size_t year) noexcept;
-	constexpr size_t daysInYear(size_t year) noexcept;
-	constexpr size_t hoursInYear(size_t year) noexcept;
-	constexpr size_t minutesInYear(size_t year) noexcept;
-	constexpr size_t secondsInYear(size_t year) noexcept;
-	constexpr size_t daysInMonth(size_t month, size_t year) noexcept;
-	constexpr size_t hoursInMonth(size_t month, size_t year) noexcept;
-	constexpr size_t minutesInMonth(size_t month, size_t year) noexcept;
-	constexpr size_t secondsInMonth(size_t month, size_t year) noexcept;
-	std::string joinDate(size_t day, size_t month, size_t year) noexcept;
-	enumeration::enWeekday getWeekday(size_t day, size_t month, size_t year) noexcept;
-	enumeration::enWeekday getWeekday(const stDate &date) noexcept;
-	bool isLastDayInWeek(enumeration::enWeekday weekday) noexcept;
-	bool isLastDayInWeek(const stDate &date) noexcept;
-	bool isWeekend(enumeration::enWeekday weekday) noexcept;
-	bool isWeekend(size_t day, size_t month, size_t year) noexcept;
-	bool isWeekend(const stDate &date) noexcept;
-	bool isBusinessDay(enumeration::enWeekday weekday) noexcept;
-	bool isBusinessDay(size_t day, size_t month, size_t year) noexcept;
-	bool isBusinessDay(const stDate &date) noexcept;
-	size_t daysLeftInWeek(const stDate &date) noexcept;
-	size_t daysLeftInMonth(const stDate &date) noexcept;
-	size_t daysLeftInYear(stDate date) noexcept;
-	std::string getMonthName(enumeration::enMonth month, bool fullName = true) noexcept;
-	std::string getWeekdayName(enumeration::enWeekday weekday, bool shortName = false) noexcept;
-	size_t dayOfYear(size_t day, size_t month, size_t year) noexcept;
-	stDate getDateFromDayOfYear(size_t year, size_t numberOfDays, size_t daysAdd = 0);
-	bool isAfter(const stDate &date1, const stDate &date2) noexcept;
-	bool isEqual(const stDate &date1, const stDate &date2) noexcept;
-	bool isBefore(const stDate &date1, const stDate &date2) noexcept;
-	bool isLastDayInMonth(size_t day, size_t month, size_t year) noexcept;
-	bool isLastMonthInYear(size_t day, size_t month, size_t year) noexcept;
 	stDate addUnits(stDate date, size_t days = 1, size_t months = 0, size_t years = 0, size_t decades = 0, size_t centuries = 0, size_t millenniums = 0);
-	stDate subUnits(stDate date, size_t days = 1, size_t months = 0, size_t years = 0, size_t decades = 0, size_t centuries = 0, size_t millenniums = 0);
-	size_t daysFromYearOne(const stDate &date, bool includeLastDay = false) noexcept;
-	long long daysBetween(const stDate &date1, const stDate &date2, bool includeLastDay = false, bool absoluteDiff = false) noexcept;
-	long long daysBetween(const stPeriod &period, bool includeLastDay = false, bool absoluteDiff = false) noexcept;
-	stDate getSystemDate();
 	size_t ageInDays(const stDate &birthDate);
+	long long calculatePeriod(const stDate &date1, const stDate &date2, bool includeLastDay = false) noexcept;
+	long long calculatePeriod(const stPeriod &period, bool includeLastDay = false) noexcept;
 	size_t calculateVacationDays(stDate dateFrom, stDate dateTo, bool includeWeekends = false);
 	stDate CalculateVacationReturnDate(stDate date, long long vacationDays, bool includeWeekends = false);
 	enumeration::enDateCompare compareDate(const stDate &d1, const stDate &d2) noexcept;
-	bool isOverlap(const stDate &date1From, const stDate &date1To, const stDate &date2From, const stDate &date2To) noexcept;
-	bool isOverlap(const stPeriod &period1, const stPeriod &period2) noexcept;
-	long long calculatePeriod(const stDate &date1, const stDate &date2, bool includeLastDay = false) noexcept;
-	long long calculatePeriod(const stPeriod &period, bool includeLastDay = false) noexcept;
-	bool isDateInPeriod(const stDate &date, const stDate &dateStart, const stDate &dateEnd) noexcept;
-	bool isDateInPeriod(const stDate &date, const stPeriod &period) noexcept;
-	std::size_t countOverlapDays(const stPeriod &period1, const stPeriod &period2) noexcept;
-	bool isValidDate(const stDate &date) noexcept;
 	stDate convertToDate(std::string_view dateString);
+	std::size_t countOverlapDays(const stPeriod &period1, const stPeriod &period2) noexcept;
 	std::string dateToString(const stDate &date, enumeration::enDateFormat format = enumeration::enDateFormat::basicFormat);
 	std::string dateToString(const stDate &date, std::string_view format);
-
+	size_t dayOfYear(size_t day, size_t month, size_t year) noexcept;
+	long long daysBetween(const stDate &date1, const stDate &date2, bool includeLastDay = false, bool absoluteDiff = false) noexcept;
+	long long daysBetween(const stPeriod &period, bool includeLastDay = false, bool absoluteDiff = false) noexcept;
+	size_t daysFromYearOne(const stDate &date, bool includeLastDay = false) noexcept;
+	constexpr size_t daysInMonth(size_t month, size_t year) noexcept;
+	constexpr size_t daysInYear(size_t year) noexcept;
+	size_t daysLeftInMonth(const stDate &date) noexcept;
+	size_t daysLeftInWeek(const stDate &date) noexcept;
+	size_t daysLeftInYear(stDate date) noexcept;
+	stDate getDateFromDayOfYear(size_t year, size_t numberOfDays, size_t daysAdd = 0);
+	std::string getMonthName(enumeration::enMonth month, bool fullName = true) noexcept;
+	stDate getSystemDate();
+	enumeration::enWeekday getWeekday(size_t day, size_t month, size_t year) noexcept;
+	enumeration::enWeekday getWeekday(const stDate &date) noexcept;
+	std::string getWeekdayName(enumeration::enWeekday weekday, bool shortName = false) noexcept;
+	constexpr size_t hoursInMonth(size_t month, size_t year) noexcept;
+	constexpr size_t hoursInYear(size_t year) noexcept;
+	bool isAfter(const stDate &date1, const stDate &date2) noexcept;
+	bool isBefore(const stDate &date1, const stDate &date2) noexcept;
+	bool isBusinessDay(enumeration::enWeekday weekday) noexcept;
+	bool isBusinessDay(size_t day, size_t month, size_t year) noexcept;
+	bool isBusinessDay(const stDate &date) noexcept;
+	bool isDateInPeriod(const stDate &date, const stDate &dateStart, const stDate &dateEnd) noexcept;
+	bool isDateInPeriod(const stDate &date, const stPeriod &period) noexcept;
+	bool isEqual(const stDate &date1, const stDate &date2) noexcept;
+	bool isLastDayInMonth(size_t day, size_t month, size_t year) noexcept;
+	bool isLastDayInWeek(enumeration::enWeekday weekday) noexcept;
+	bool isLastDayInWeek(const stDate &date) noexcept;
+	bool isLastMonthInYear(size_t day, size_t month, size_t year) noexcept;
+	constexpr bool isLeapYear(size_t year) noexcept;
+	bool isOverlap(const stDate &date1From, const stDate &date1To, const stDate &date2From, const stDate &date2To) noexcept;
+	bool isOverlap(const stPeriod &period1, const stPeriod &period2) noexcept;
+	bool isValidDate(const stDate &date) noexcept;
+	bool isWeekend(enumeration::enWeekday weekday) noexcept;
+	bool isWeekend(size_t day, size_t month, size_t year) noexcept;
+	bool isWeekend(const stDate &date) noexcept;
+	std::string joinDate(size_t day, size_t month, size_t year) noexcept;
+	constexpr size_t minutesInMonth(size_t month, size_t year) noexcept;
+	constexpr size_t minutesInYear(size_t year) noexcept;
+	constexpr size_t secondsInMonth(size_t month, size_t year) noexcept;
+	constexpr size_t secondsInYear(size_t year) noexcept;
+	stDate subUnits(stDate date, size_t days = 1, size_t months = 0, size_t years = 0, size_t decades = 0, size_t centuries = 0, size_t millenniums = 0);
 	// ==================================================================
 	//  Calendar Math Implementations
 	// ==================================================================

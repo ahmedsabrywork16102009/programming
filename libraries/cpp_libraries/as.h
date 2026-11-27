@@ -15,11 +15,11 @@
 #include "storage/file_utils.h"
 
 namespace AS {
-	namespace enumeration = ::enumeration;
-	namespace process = ::process;
-	namespace input = ::input;
-	namespace output = ::output;
-	namespace storage = ::storage;
-	namespace bank = ::bank;
-	namespace clients = ::clients;
+	using namespace enumeration;
+	using namespace process;
+	using namespace input;
+	using namespace output;
+	using namespace storage;
+	using namespace bank;
+	using namespace clients;
 }  // namespace AS
